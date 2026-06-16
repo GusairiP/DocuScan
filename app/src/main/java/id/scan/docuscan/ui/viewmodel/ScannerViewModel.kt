@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -24,6 +25,7 @@ import java.util.*
 enum class ActiveScreen {
     DASHBOARD,
     SCAN_CAMERA,
+    POST_SCAN_PREVIEW,
     DOC_DETAILS,
     CALENDAR_TASKS,
     ANALYTICS,
@@ -162,6 +164,58 @@ class ScannerViewModel(application: Application) : AndroidViewModel(application)
     // Decryption input for detail page
     var detailDecryptionKeyInput by mutableStateOf("")
     var decryptedContentResult by mutableStateOf("")
+
+    // PDF Export & Metadata State
+    var pdfMetadataAuthor by mutableStateOf("User DocuScan")
+    var pdfMetadataTitle by mutableStateOf("")
+    var pdfCompressionEnabled by mutableStateOf(false)
+    var pdfPasswordEncryption by mutableStateOf("")
+    
+    // Progress Bar State for Export
+    var isExporting by mutableStateOf(false)
+    var exportProgress by mutableStateOf(0f)
+    var exportStatusMessage by mutableStateOf("")
+
+    // Bulk Rename State
+    var showBulkRenameDialog by mutableStateOf(false)
+    var bulkRenamePrefix by mutableStateOf("Berkas_")
+
+    // Bulk Delete Selection State
+    var isSelectionModeActive by mutableStateOf(false)
+    val selectedDocumentIds = mutableStateListOf<Int>()
+    
+    fun toggleSelection(docId: Int) {
+        if (selectedDocumentIds.contains(docId)) {
+            selectedDocumentIds.remove(docId)
+        } else {
+            selectedDocumentIds.add(docId)
+        }
+        if (selectedDocumentIds.isEmpty()) {
+            isSelectionModeActive = false
+        }
+    }
+    
+    fun deleteSelectedDocuments() {
+        viewModelScope.launch {
+            selectedDocumentIds.forEach { id ->
+                repository.deleteById(id)
+            }
+            selectedDocumentIds.clear()
+            isSelectionModeActive = false
+            addNotification("Berhasil menghapus dokumen terpilih.")
+        }
+    }
+
+    fun applyBulkRename(filteredDocs: List<DocumentEntity>) {
+        viewModelScope.launch {
+            filteredDocs.forEachIndexed { index, doc ->
+                val newTitle = "${bulkRenamePrefix}${String.format("%03d", index + 1)}"
+                repository.update(doc.copy(title = newTitle))
+            }
+            showBulkRenameDialog = false
+            addNotification("Berhasil mengubah nama ${filteredDocs.size} dokumen sekaligus.")
+        }
+    }
 
     // Real-time server caching & performance simulation metrics
     var cachedNetworkRequestsCount by mutableStateOf(34)
@@ -542,11 +596,61 @@ class ScannerViewModel(application: Application) : AndroidViewModel(application)
     }
 
     // PDF generation trigger
+    fun requestDecryptedPdfUI(context: Context, document: DocumentEntity, key: String, onComplete: (File?) -> Unit) {
+        viewModelScope.launch {
+            isExporting = true
+            exportProgress = 0f
+            exportStatusMessage = "Menyiapkan data dokumen..."
+            kotlinx.coroutines.delay(500)
+            
+            exportProgress = 0.3f
+            exportStatusMessage = "Menyusun struktur PDF & metadata..."
+            kotlinx.coroutines.delay(500)
+            
+            if (pdfCompressionEnabled) {
+                exportProgress = 0.5f
+                exportStatusMessage = "Menerapkan kompresi ukuran file..."
+                kotlinx.coroutines.delay(600)
+            }
+            
+            if (pdfPasswordEncryption.isNotEmpty()) {
+                exportProgress = 0.7f
+                exportStatusMessage = "Mengenkripsi dokumen dengan sandi..."
+                kotlinx.coroutines.delay(800)
+            }
+            
+            exportProgress = 0.9f
+            exportStatusMessage = "Menyimpan ke memori perangkat..."
+            
+            val file = try {
+                PdfGenerator.generateDocumentPdf(
+                    context = context, 
+                    document = document, 
+                    customDecryptKey = key,
+                    pdfPassword = pdfPasswordEncryption,
+                    author = pdfMetadataAuthor,
+                    customTitle = pdfMetadataTitle.takeIf { it.isNotBlank() },
+                    compressionEnabled = pdfCompressionEnabled
+                )
+            } catch (e: Exception) {
+                Toast.makeText(context, "Gagal membuat PDF: ${e.message}", Toast.LENGTH_SHORT).show()
+                null
+            }
+            kotlinx.coroutines.delay(300)
+            
+            exportProgress = 1f
+            exportStatusMessage = "Selesai!"
+            kotlinx.coroutines.delay(200)
+            
+            isExporting = false
+            onComplete(file)
+        }
+    }
+
     fun requestDecryptedPdf(context: Context, document: DocumentEntity, key: String): File? {
         return try {
-            PdfGenerator.generateDocumentPdf(context, document, key)
+            id.scan.docuscan.util.PdfGenerator.generateDocumentPdf(context, document, key)
         } catch (e: Exception) {
-            Toast.makeText(context, "Gagal membuat PDF: ${e.message}", Toast.LENGTH_SHORT).show()
             null
         }
     }

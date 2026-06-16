@@ -117,6 +117,7 @@ class MainActivity : FragmentActivity() {
                                 when (viewModel.currentScreen) {
                                     ActiveScreen.DASHBOARD -> DashboardScreen(viewModel = viewModel)
                                     ActiveScreen.SCAN_CAMERA -> CameraScannerScreen(viewModel = viewModel)
+                                    ActiveScreen.POST_SCAN_PREVIEW -> PostScanPreviewScreen(viewModel = viewModel)
                                     ActiveScreen.DOC_DETAILS -> DocumentDetailsScreen(viewModel = viewModel)
                                     ActiveScreen.CALENDAR_TASKS -> CalendarTasksScreen(viewModel = viewModel)
                                     ActiveScreen.ANALYTICS -> AnalyticsScreen(viewModel = viewModel)
@@ -518,6 +519,35 @@ fun DashboardScreen(viewModel: ScannerViewModel) {
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
             
+            // Selection Mode Contextual Bar
+            if (viewModel.isSelectionModeActive) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.primaryContainer)
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "${viewModel.selectedDocumentIds.size} Terpilih",
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        IconButton(onClick = { viewModel.deleteSelectedDocuments() }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete Selected", tint = MaterialTheme.colorScheme.error)
+                        }
+                        IconButton(onClick = { 
+                            viewModel.isSelectionModeActive = false
+                            viewModel.selectedDocumentIds.clear()
+                        }) {
+                            Icon(Icons.Default.Close, contentDescription = "Close Selection", tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                        }
+                    }
+                }
+            }
+
             // Notification Tray for Daily field reminders
             val alerts by viewModel.notifications.collectAsStateWithLifecycle()
             if (alerts.isNotEmpty()) {
@@ -855,27 +885,47 @@ fun DashboardScreen(viewModel: ScannerViewModel) {
                     fontFamily = FontFamily.Monospace
                 )
 
-                // Report trigger
-                Button(
-                    onClick = {
-                        val pdfFile = viewModel.requestDailyReportPdf(context)
-                        if (pdfFile != null && pdfFile.exists()) {
-                            triggerPdfViewer(context, pdfFile)
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
-                    ),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                    modifier = Modifier.height(28.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Share, 
-                        contentDescription = null, 
-                        modifier = Modifier.size(12.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Kirim PDF Harian", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Bulk Rename Trigger
+                    Button(
+                        onClick = { viewModel.showBulkRenameDialog = true },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.9f)
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        modifier = Modifier.height(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit, 
+                            contentDescription = null, 
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Ganti Nama", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    // Report trigger
+                    Button(
+                        onClick = {
+                            val pdfFile = viewModel.requestDailyReportPdf(context)
+                            if (pdfFile != null && pdfFile.exists()) {
+                                triggerPdfViewer(context, pdfFile)
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        modifier = Modifier.height(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share, 
+                            contentDescription = null, 
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Kirim PDF Harian", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
 
@@ -1013,11 +1063,21 @@ fun DashboardScreen(viewModel: ScannerViewModel) {
                     items(filteredDocs) { doc ->
                         DocumentItemCard(
                             document = doc,
+                            isSelectionMode = viewModel.isSelectionModeActive,
+                            isSelected = viewModel.selectedDocumentIds.contains(doc.id),
                             onClick = {
-                                viewModel.selectedDocument = doc
-                                viewModel.detailDecryptionKeyInput = ""
-                                viewModel.decryptedContentResult = ""
-                                viewModel.currentScreen = ActiveScreen.DOC_DETAILS
+                                if (viewModel.isSelectionModeActive) {
+                                    viewModel.toggleSelection(doc.id)
+                                } else {
+                                    viewModel.selectedDocument = doc
+                                    viewModel.detailDecryptionKeyInput = ""
+                                    viewModel.decryptedContentResult = ""
+                                    viewModel.currentScreen = ActiveScreen.DOC_DETAILS
+                                }
+                            },
+                            onLongClick = {
+                                viewModel.isSelectionModeActive = true
+                                viewModel.toggleSelection(doc.id)
                             }
                         )
                     }
@@ -1046,6 +1106,36 @@ fun DashboardScreen(viewModel: ScannerViewModel) {
                 offsetX = (-16).dp,
                 offsetY = (-80).dp,
                 onNext = { viewModel.completeOnboardingStep() }
+            )
+        }
+
+        if (viewModel.showBulkRenameDialog) {
+            AlertDialog(
+                onDismissRequest = { viewModel.showBulkRenameDialog = false },
+                title = { Text("Ganti Nama Masal (Bulk Rename)", fontSize = 16.sp, fontWeight = FontWeight.Bold) },
+                text = {
+                    Column {
+                        Text("Tentukan nama pola untuk ${filteredDocs.size} dokumen yang tampil. Nomor akan ditambahkan di akhir secara otomatis.", fontSize = 12.sp)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        OutlinedTextField(
+                            value = viewModel.bulkRenamePrefix,
+                            onValueChange = { viewModel.bulkRenamePrefix = it },
+                            label = { Text("Pola Nama (Contoh: Invoice_)", fontSize = 10.sp) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(onClick = { viewModel.applyBulkRename(filteredDocs) }) {
+                        Text("Konfirmasi")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { viewModel.showBulkRenameDialog = false }) {
+                        Text("Batal")
+                    }
+                }
             )
         }
     }
@@ -1142,17 +1232,27 @@ fun InAppSponsoredAdCard() {
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun DocumentItemCard(document: DocumentEntity, onClick: () -> Unit) {
+fun DocumentItemCard(
+    document: DocumentEntity,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
+    isSelectionMode: Boolean = false,
+    isSelected: Boolean = false
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
             .testTag("doc_card_${document.id}"),
         shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        border = BorderStroke(if (isSelected) 2.dp else 1.dp, if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
@@ -1284,11 +1384,14 @@ fun DocumentItemCard(document: DocumentEntity, onClick: () -> Unit) {
                     Spacer(modifier = Modifier.width(4.dp))
                 }
 
-                // Cloud Status
+                // Cloud Status (Syncing / Synced / Offline)
+                val cloudIcon = if (document.isCloudSynced) Icons.Default.Done else Icons.Default.Warning
+                val cloudTint = if (document.isCloudSynced) Color(0xFF10B981) else Color.Gray
+
                 Icon(
-                    imageVector = if (document.isCloudSynced) Icons.Default.Done else Icons.Default.Warning,
-                    contentDescription = if (document.isCloudSynced) "Synced to Cloud" else "Local pending sync",
-                    tint = if (document.isCloudSynced) Color(0xFF10B981) else Color(0xFFF59E0B),
+                    imageVector = cloudIcon,
+                    contentDescription = if (document.isCloudSynced) "Synced to Cloud" else "Offline",
+                    tint = cloudTint,
                     modifier = Modifier.size(18.dp)
                 )
             }
@@ -1734,582 +1837,282 @@ fun CameraScannerScreen(viewModel: ScannerViewModel) {
             }
         }
 
-        // Scanning Mode Selector (Single vs Batch)
+        // Simply show the camera viewfinder and a capture button.
         item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
-                modifier = Modifier.fillMaxWidth()
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 24.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text(
-                        text = "TIPE PEMINDAIAN KAMERA",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        // Single Page
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(
-                                    if (!viewModel.isBatchMode) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.surface
-                                )
-                                .border(
-                                    1.dp,
-                                    if (!viewModel.isBatchMode) Color.Transparent else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-                                    RoundedCornerShape(8.dp)
-                                )
-                                .clickable { viewModel.isBatchMode = false }
-                                .padding(vertical = 10.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "Halaman Tunggal",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (!viewModel.isBatchMode) Color.White else MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-
-                        // Batch Mode
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(
-                                    if (viewModel.isBatchMode) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.surface
-                                )
-                                .border(
-                                    1.dp,
-                                    if (viewModel.isBatchMode) Color.Transparent else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                                    RoundedCornerShape(8.dp)
-                                )
-                                .clickable { viewModel.isBatchMode = true }
-                                .padding(vertical = 10.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.List,
-                                    contentDescription = null,
-                                    tint = if (viewModel.isBatchMode) Color.White else MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "Batch Multihalaman",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (viewModel.isBatchMode) Color.White else MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        }
-                    }
-
-                    if (viewModel.isBatchMode) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(20.dp)
-                                        .clip(CircleShape)
-                                        .background(ScannerGlowGreen),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = viewModel.batchCapturedPages.size.toString(),
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = Color.Black
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Halaman dalam antrean batch",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            
-                            if (viewModel.batchCapturedPages.isNotEmpty()) {
-                                Text(
-                                    text = "Sapu Bersih",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.clickable {
-                                        viewModel.batchCapturedPages = emptyList()
-                                        Toast.makeText(context, "Antrean batch dikosongkan!", Toast.LENGTH_SHORT).show()
-                                    }
-                                )
-                            }
-                        }
-
-                        // Preview page list if any
-                        if (viewModel.batchCapturedPages.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                viewModel.batchCapturedPages.forEachIndexed { index, content ->
-                                    Card(
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
-                                        modifier = Modifier.width(130.dp)
-                                    ) {
-                                        Column(modifier = Modifier.padding(8.dp)) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Text(
-                                                    text = "HALAMAN ${index + 1}",
-                                                    fontSize = 8.sp,
-                                                    fontWeight = FontWeight.ExtraBold,
-                                                    color = MaterialTheme.colorScheme.primary,
-                                                    fontFamily = FontFamily.Monospace
-                                                )
-                                                IconButton(
-                                                    onClick = {
-                                                        val list = viewModel.batchCapturedPages.toMutableList()
-                                                        list.removeAt(index)
-                                                        viewModel.batchCapturedPages = list
-                                                    },
-                                                    modifier = Modifier.size(16.dp)
-                                                ) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.Close,
-                                                        contentDescription = null,
-                                                        tint = MaterialTheme.colorScheme.error,
-                                                        modifier = Modifier.size(10.dp)
-                                                    )
-                                                }
-                                            }
-                                            Spacer(modifier = Modifier.height(2.dp))
-                                            Text(
-                                                text = if (content.length > 40) content.take(37) + "..." else content,
-                                                fontSize = 8.sp,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                lineHeight = 10.sp
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-
-        // Title text input
-        item {
-            Column {
-                Text(
-                    text = "1. Metadata Dokumen & Arsipkan",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                OutlinedTextField(
-                    value = viewModel.scanTitle,
-                    onValueChange = { viewModel.scanTitle = it },
-                    label = { Text("Nama Dokumen (Contoh: Kwitansi Konsumsi, Adendum Alkes)") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("scan_title_input"),
-                    shape = RoundedCornerShape(8.dp),
-                    singleLine = true
-                )
-            }
-        }
-
-        // Scan Category selector grid
-        item {
-            Column {
-                Text(
-                    text = "2. Pilih Kategori Folder",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                val availableCategories = listOf("Sertifikat", "Kwitansi", "Kontrak", "Invoice", "Lainnya")
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                ) {
-                    availableCategories.forEach { cat ->
-                        val isSel = viewModel.scanCategory == cat
-                        Button(
-                            onClick = { viewModel.scanCategory = cat },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isSel) MaterialTheme.colorScheme.primary 
-                                                else MaterialTheme.colorScheme.surface,
-                                contentColor = if (isSel) Color.White 
-                                                else MaterialTheme.colorScheme.onSurface
-                            ),
-                            shape = RoundedCornerShape(20.dp),
-                            modifier = Modifier
-                                .padding(end = 6.dp)
-                                .border(
-                                    1.dp, 
-                                    if (isSel) Color.Transparent else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), 
-                                    RoundedCornerShape(20.dp)
-                                ),
-                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
-                        ) {
-                            Text(cat, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
-        }
-
-        // Scan Tags Multi-select Row
-        item {
-            Column {
-                Text(
-                    text = "2.5. Berikan Label / Organisasi Tags",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Labelisasi membantu Anda mencari berkas dan menyusun arsip lapangan dengan cepat.",
-                    fontSize = 10.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                val selectableTags = listOf("Work", "Receipt", "Identity", "Personal")
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                ) {
-                    selectableTags.forEach { tag ->
-                        val isSel = viewModel.scanTags.contains(tag)
-                        Box(
-                            modifier = Modifier
-                                .padding(end = 6.dp)
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(
-                                    if (isSel) MaterialTheme.colorScheme.primary 
-                                    else MaterialTheme.colorScheme.surface
-                                )
-                                .border(
-                                    1.dp,
-                                    if (isSel) Color.Transparent else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                                    RoundedCornerShape(20.dp)
-                                )
-                                .clickable {
-                                    val current = viewModel.scanTags.toMutableSet()
-                                    if (isSel) current.remove(tag) else current.add(tag)
-                                    viewModel.scanTags = current
-                                }
-                                .padding(horizontal = 14.dp, vertical = 6.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                if (isSel) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(12.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                }
-                                Text(
-                                    text = tag,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isSel) Color.White else MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // AI Filter text sharpening & performance enhancement triggers
-        item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text(
-                        text = "3. Peningkatan Hasil Scan (AI Filter Tekstur)",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.height(1.dp))
-                    Text(
-                        text = "Teknologi filter mempertajam tepi huruf (sharpen contrast) menjamin teks mudah dibaca.",
-                        fontSize = 10.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        val filters = listOf(
-                            "AI_SHARP" to "AI Sharpen (Teks Tajam)",
-                            "MONOCHROME" to "Monochrome (Hitam Putih)",
-                            "ORIGINAL" to "No Filter (Asli)"
-                        )
-                        filters.forEach { (type, label) ->
-                            val isSel = viewModel.scanFilterType == type
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .padding(horizontal = 4.dp)
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(
-                                        if (isSel) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                                        else MaterialTheme.colorScheme.background
-                                    )
-                                    .border(
-                                        1.dp,
-                                        if (isSel) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                        RoundedCornerShape(6.dp)
-                                    )
-                                    .clickable { viewModel.scanFilterType = type }
-                                    .padding(vertical = 8.dp, horizontal = 4.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = label,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Encryption parameters (End-To-End) & calendar assignments
-        item {
-            Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "4. Opsi Kepatuhan Keamanan & Kalender",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Text(
-                        text = if (isConfigAdvancedOpen) "Tutup" else "Buka Detail",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.clickable { isConfigAdvancedOpen = !isConfigAdvancedOpen }
-                    )
-                }
-
-                if (isConfigAdvancedOpen) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            // Encryption settings
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text("Enkripsi End-to-End (AES-CBC)", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    Text("Enkripsi teks transkripsi dari server cloud", fontSize = 10.sp, color = Color.Gray)
-                                }
-                                Switch(
-                                    checked = viewModel.scanIsEncrypted,
-                                    onCheckedChange = { viewModel.scanIsEncrypted = it }
-                                )
-                            }
-
-                            if (viewModel.scanIsEncrypted) {
-                                OutlinedTextField(
-                                    value = viewModel.scanEncryptionKey,
-                                    onValueChange = { viewModel.scanEncryptionKey = it },
-                                    label = { Text("Kunci Rahasia Enkripsi (Contoh: 1234, AdminSecret)") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(8.dp),
-                                    visualTransformation = PasswordVisualTransformation(),
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                                    singleLine = true
-                                )
-                            }
-
-                            // Calendar linkage
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text("Lapor Sebagai Tugas Mendesak", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    Text("Kirim notifikasi alarm pengingat harian", fontSize = 10.sp, color = Color.Gray)
-                                }
-                                Switch(
-                                    checked = viewModel.scanIsUrgent,
-                                    onCheckedChange = { viewModel.scanIsUrgent = it }
-                                )
-                            }
-
-                            // Target task date
-                            OutlinedTextField(
-                                value = viewModel.scanAssociatedDate,
-                                onValueChange = { viewModel.scanAssociatedDate = it },
-                                label = { Text("Tanggal Kegiatan (Format: YYYY-MM-DD)") },
-                                placeholder = { Text("Contoh: 2026-06-16") },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(8.dp),
-                                singleLine = true
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // Perform capture trigger button
-        item {
-            if (viewModel.isBatchMode) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // Button 1: Capture page
-                    Button(
-                        onClick = {
-                            viewModel.capturePageForBatch(context) {
-                                // Keep scanner open, page added successfully
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp)
-                            .testTag("execute_scan_page_button"),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        enabled = !viewModel.isScanningModeActive && viewModel.scanTitle.isNotEmpty()
-                    ) {
-                        Icon(Icons.Default.Add, null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "PINDAI & AMBIL HALAMAN (${viewModel.batchCapturedPages.size + 1})",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-
-                    // Button 2: Finish & Compile Batch
-                    Button(
-                        onClick = {
-                            viewModel.finishBatchScanAndSave(context) {
-                                viewModel.currentScreen = ActiveScreen.DASHBOARD
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp)
-                            .testTag("execute_compile_batch_button"),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = ScannerGlowGreen,
-                            contentColor = Color.Black
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        enabled = !viewModel.isScanningModeActive && viewModel.batchCapturedPages.isNotEmpty()
-                    ) {
-                        Icon(Icons.Default.Check, null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "GABUNGKAN & PROSES KOMPILASI (" + viewModel.batchCapturedPages.size + " HAL)",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-                }
-            } else {
-                Button(
-                    onClick = {
-                        viewModel.startDocumentScanCapture(context) {
-                            viewModel.currentScreen = ActiveScreen.DASHBOARD
-                        }
+                FloatingActionButton(
+                    onClick = { 
+                        // Directly go to post-scan preview
+                        viewModel.currentScreen = ActiveScreen.POST_SCAN_PREVIEW
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .testTag("execute_scan_button"),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    ),
-                    shape = RoundedCornerShape(8.dp),
-                    enabled = !viewModel.isScanningModeActive
+                    modifier = Modifier.size(72.dp),
+                    shape = CircleShape,
+                    containerColor = Color.White,
+                    contentColor = MaterialTheme.colorScheme.primary
                 ) {
-                    Icon(Icons.Default.Add, null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "REKAM PINDAIAN & PROSES OCR",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
+                    Icon(Icons.Default.Add, contentDescription = "Capture Document", modifier = Modifier.size(36.dp))
                 }
             }
-        } // close item
+        }
     } // close LazyColumn
-
+    
     if (viewModel.onboardingStep == 2) {
         CoachMarkOverlay(
-            text = "Arahkan kamera ke dokumen. AI akan mendeteksi batas tepi (Edge Detection) secara otomatis dan mengambil beberapa pemindaian sekaligus dalam Batch Scan.",
+            text = "Arahkan kamera ke dokumen. AI akan mendeteksi batas tepi (Edge Detection) secara otomatis.",
             alignment = Alignment.Center,
             onNext = { viewModel.completeOnboardingStep() }
         )
     }
 } // close Box
 } // close CameraScannerScreen
+
+// ==========================================
+// SCREEN 2.5: POST-SCAN PREVIEW
+// ==========================================
+@Composable
+fun PostScanPreviewScreen(viewModel: ScannerViewModel) {
+    val context = LocalContext.current
+    var isConfigAdvancedOpen by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Toggle Original vs AI-Enhanced Preview
+        Card(
+            modifier = Modifier.fillMaxWidth().height(220.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)).padding(8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Text(
+                        "Original Image", 
+                        Modifier.clickable { viewModel.scanFilterType = "ORIGINAL" }.padding(4.dp),
+                        fontWeight = if (viewModel.scanFilterType == "ORIGINAL") FontWeight.Bold else FontWeight.Normal,
+                        color = if (viewModel.scanFilterType == "ORIGINAL") MaterialTheme.colorScheme.primary else Color.Gray
+                    )
+                    Text(
+                        "AI Enhanced B&W", 
+                        Modifier.clickable { viewModel.scanFilterType = "AI_SHARP" }.padding(4.dp),
+                        fontWeight = if (viewModel.scanFilterType != "ORIGINAL") FontWeight.Bold else FontWeight.Normal,
+                        color = if (viewModel.scanFilterType != "ORIGINAL") MaterialTheme.colorScheme.primary else Color.Gray
+                    )
+                }
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    if (viewModel.scanFilterType == "ORIGINAL") {
+                        Icon(Icons.Default.Info, contentDescription = "Original", modifier = Modifier.size(80.dp), tint = Color.Gray)
+                        Text("Mockup: Original Camera Photo", Modifier.align(Alignment.BottomCenter).padding(8.dp), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    } else {
+                        Icon(Icons.Default.Edit, contentDescription = "AI Enhanced", modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.primary)
+                        Text("Mockup: Sharp Contrast B&W Document", Modifier.align(Alignment.BottomCenter).padding(8.dp), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    }
+                }
+            }
+        }
+
+        // Title text input
+        Column {
+            Text(
+                text = "1. Metadata Dokumen & Arsipkan",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            OutlinedTextField(
+                value = viewModel.scanTitle,
+                onValueChange = { viewModel.scanTitle = it },
+                label = { Text("Nama Dokumen (Contoh: Kwitansi Konsumsi, Adendum Alkes)") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("scan_title_input"),
+                shape = RoundedCornerShape(8.dp),
+                singleLine = true
+            )
+        }
+
+        // Scan Category selector grid
+        Column {
+            Text(
+                text = "2. Pilih Kategori Folder",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            val availableCategories = listOf("Sertifikat", "Kwitansi", "Kontrak", "Invoice", "Lainnya")
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+            ) {
+                availableCategories.forEach { cat ->
+                    val isSel = viewModel.scanCategory == cat
+                    Button(
+                        onClick = { viewModel.scanCategory = cat },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isSel) MaterialTheme.colorScheme.primary 
+                                            else MaterialTheme.colorScheme.surface,
+                            contentColor = if (isSel) Color.White 
+                                            else MaterialTheme.colorScheme.onSurface
+                        ),
+                        shape = RoundedCornerShape(20.dp),
+                        modifier = Modifier
+                            .padding(end = 6.dp)
+                            .border(
+                                1.dp, 
+                                if (isSel) Color.Transparent else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), 
+                                RoundedCornerShape(20.dp)
+                            ),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                    ) {
+                        Text(cat, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
+        // Scan Tags Multi-select Row
+        Column {
+            Text(
+                text = "2.5. Berikan Label / Organisasi Tags",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            val selectableTags = listOf("Work", "Receipt", "Identity", "Personal")
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+            ) {
+                selectableTags.forEach { tag ->
+                    val isSel = viewModel.scanTags.contains(tag)
+                    Box(
+                        modifier = Modifier
+                            .padding(end = 6.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(
+                                if (isSel) MaterialTheme.colorScheme.primary 
+                                else MaterialTheme.colorScheme.surface
+                            )
+                            .border(
+                                1.dp,
+                                if (isSel) Color.Transparent else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                RoundedCornerShape(20.dp)
+                            )
+                            .clickable {
+                                val current = viewModel.scanTags.toMutableSet()
+                                if (isSel) current.remove(tag) else current.add(tag)
+                                viewModel.scanTags = current
+                            }
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (isSel) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                            }
+                            Text(
+                                text = tag,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isSel) Color.White else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Progress loading popup if actively building OCR
+        if (viewModel.isScanningModeActive) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
+                    .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
+                    .padding(12.dp)
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "PROSES INTEGRITAS DOKUMEN LAPANGAN...",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    LinearProgressIndicator(
+                        progress = { viewModel.scanningProgress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(3.dp)),
+                        color = ScannerGlowGreen,
+                        trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Filter: ${viewModel.scanFilterType}\n${viewModel.ocrProgressLog}",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontFamily = FontFamily.Monospace,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 12.dp)
+                    )
+                }
+            }
+        }
+
+        Button(
+            onClick = {
+                viewModel.startDocumentScanCapture(context) {
+                    viewModel.currentScreen = ActiveScreen.DASHBOARD
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .testTag("execute_scan_button"),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary
+            ),
+            shape = RoundedCornerShape(8.dp),
+            enabled = !viewModel.isScanningModeActive
+        ) {
+            Icon(Icons.Default.Check, null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "SIMPAN PEMINDAIAN",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            )
+        }
+    }
+}
 
 // ==========================================
 // SCREEN 3: DOCUMENT DETAILS & INTEGRATION CIPHER
@@ -2527,14 +2330,80 @@ fun DocumentDetailsScreen(viewModel: ScannerViewModel) {
                 fontFamily = FontFamily.Monospace
             )
 
+            // Dynamic Export Options Form
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Pengaturan Lanjutan PDF", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    
+                    OutlinedTextField(
+                        value = viewModel.pdfMetadataTitle,
+                        onValueChange = { viewModel.pdfMetadataTitle = it },
+                        label = { Text("Judul Dokumen (Opsional)", fontSize = 10.sp) },
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        singleLine = true,
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp)
+                    )
+                    
+                    OutlinedTextField(
+                        value = viewModel.pdfMetadataAuthor,
+                        onValueChange = { viewModel.pdfMetadataAuthor = it },
+                        label = { Text("Penulis Dokumen", fontSize = 10.sp) },
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        singleLine = true,
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp)
+                    )
+                    
+                    OutlinedTextField(
+                        value = viewModel.pdfPasswordEncryption,
+                        onValueChange = { viewModel.pdfPasswordEncryption = it },
+                        label = { Text("Kata Sandi Enkripsi Eksternal (Kosongkan bila tidak)", fontSize = 10.sp) },
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        singleLine = true,
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp)
+                    )
+                    
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().clickable { viewModel.pdfCompressionEnabled = !viewModel.pdfCompressionEnabled }
+                    ) {
+                        Checkbox(
+                            checked = viewModel.pdfCompressionEnabled,
+                            onCheckedChange = { viewModel.pdfCompressionEnabled = it },
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Gunakan kompresi ukuran file (Mengurangi beban cloud)", fontSize = 11.sp)
+                    }
+                }
+            }
+
+            if (viewModel.isExporting) {
+                Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                    Text(text = viewModel.exportStatusMessage, fontSize = 10.sp, color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    LinearProgressIndicator(
+                        progress = { viewModel.exportProgress },
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
             // PDF compilation button
             Button(
                 onClick = {
-                    val pdfFile = viewModel.requestDecryptedPdf(context, doc, viewModel.detailDecryptionKeyInput)
-                    if (pdfFile != null && pdfFile.exists()) {
-                        triggerPdfViewer(context, pdfFile)
+                    viewModel.requestDecryptedPdfUI(context, doc, viewModel.detailDecryptionKeyInput) { pdfFile ->
+                        if (pdfFile != null && pdfFile.exists()) {
+                            triggerPdfViewer(context, pdfFile)
+                        }
                     }
                 },
+                enabled = !viewModel.isExporting,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(44.dp)
@@ -3244,6 +3113,31 @@ fun SettingsScreen(viewModel: ScannerViewModel) {
             }
         }
 
+        // App Display Style Theme Settings Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text("Pengaturan Tampilan Aplikasi (Tema)", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Tema Gelap (Dark Mode)", fontSize = 12.sp)
+                        Text("Hemat baterai & ergonomis untuk mata", fontSize = 9.sp, color = Color.Gray)
+                    }
+                    Switch(
+                        checked = viewModel.isDarkMode,
+                        onCheckedChange = { viewModel.toggleDarkMode() }
+                    )
+                }
+            }
+        }
+        
         // Multi-Language OCR Pack Selection
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -3512,7 +3406,7 @@ fun SettingsScreen(viewModel: ScannerViewModel) {
             }
         }
 
-        // About the DocuScan offline-first engine
+        // About Me & The App
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f)),
@@ -3520,14 +3414,44 @@ fun SettingsScreen(viewModel: ScannerViewModel) {
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    text = "Tentang DocuScan v1.0.0",
+                    text = "Tentang Aplikasi & Creator (About Me)",
                     fontWeight = FontWeight.Bold,
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.primary
                 )
                 
                 Text(
-                    text = "Aplikasi scan dengan standardisasi industri militer. Beroperasi penuh secara offline, ideal untuk agen keamanan lapangan, logistik, pengiriman barang, dan mobilitas kerja tinggi di daerah tanpa jaringan sinyal.",
+                    text = "DocuScan v1.0.0 | Dibuat oleh: Gusairi Putra\n\nAplikasi pemindai revolusioner dengan standardisasi industri. Beroperasi penuh offline untuk efisiensi lapangan.",
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 14.sp
+                )
+
+                Divider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+
+                Text(
+                    text = "Stack Teknologi (Tools):",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "• Kotlin, Jetpack Compose, Room SQLite\n• Tesseract OCR Engine (Local)\n• AES-256 E2E Encryption",
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 14.sp
+                )
+
+                Divider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+
+                Text(
+                    text = "Pembaruan GitHub Terbaru (Changelog):",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "• Ditambahkan: Fitur mode pratinjau pindaian (Original vs B&W).\n• Ditambahkan: Pemilihan tema terang/gelap pada aplikasi.\n• Ditambahkan: Mode hapus masal (Bulk Delete).\n• Perbaikan: Status Sinkronisasi Cloud terselesaikan.",
                     fontSize = 10.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 14.sp

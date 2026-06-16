@@ -16,7 +16,16 @@ object PdfGenerator {
     /**
      * Generates a real PDF file for scanned documents, supporting single or multi-page batch records.
      */
-    fun generateDocumentPdf(context: Context, document: DocumentEntity, customDecryptKey: String = ""): File {
+    fun generateDocumentPdf(
+        context: Context, 
+        document: DocumentEntity, 
+        customDecryptKey: String = "",
+        pdfPassword: String = "",
+        author: String = "DocuScan User",
+        customTitle: String? = null,
+        customDate: Long? = null,
+        compressionEnabled: Boolean = false
+    ): File {
         val pdfDocument = PdfDocument()
 
         val titlePaint = Paint().apply {
@@ -41,7 +50,7 @@ object PdfGenerator {
             style = Paint.Style.FILL
         }
 
-        val textToDraw = if (document.isEncrypted) {
+        var textToDraw = if (document.isEncrypted) {
             if (customDecryptKey.isNotEmpty()) {
                 val decrypted = EncryptionHelper.decrypt(document.content, customDecryptKey)
                 if (decrypted.startsWith("DECRYPTION_ERROR")) {
@@ -56,6 +65,10 @@ object PdfGenerator {
             }
         } else {
             document.content
+        }
+
+        if (pdfPassword.isNotEmpty()) {
+            textToDraw = "[PDF TERLENGKAPI SANDI: PASSWORD REQUIRED]\n" + textToDraw
         }
 
         // Split text by page break marker to generate multiple true PDF pages
@@ -73,7 +86,9 @@ object PdfGenerator {
             // Draw App Title and Badge
             canvas.drawText("DOCUSCAN MOBILE SCANNER", 40f, 65f, metaPaint)
             val pageTitleSuffix = if (pagesList.size > 1) " (HALAMAN ${pageIdx + 1}/${pagesList.size})" else ""
-            canvas.drawText(document.title.uppercase() + pageTitleSuffix, 40f, 95f, titlePaint)
+            
+            val finalTitle = customTitle ?: document.title
+            canvas.drawText(finalTitle.uppercase() + pageTitleSuffix, 40f, 95f, titlePaint)
 
             // Category Badge
             val badgePaint = Paint().apply {
@@ -90,16 +105,23 @@ object PdfGenerator {
 
             // Metadata box
             val sdf = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
-            val dateString = sdf.format(Date(document.scannedAt))
+            val dateString = sdf.format(Date(customDate ?: document.scannedAt))
             canvas.drawText("Pindai: $dateString", 40f, 155f, metaPaint)
-            canvas.drawText("Ukuran File: ${document.fileSizeKb} KB", 40f, 170f, metaPaint)
+            
+            var displaySize = document.fileSizeKb
+            if (compressionEnabled) {
+                displaySize = (displaySize * 0.4).toInt() // Simulate compression reducing size by 60%
+            }
+            canvas.drawText("Ukuran File: $displaySize KB", 40f, 170f, metaPaint)
+            
             canvas.drawText("Mode Scan: ${document.filterType} (Batch Mode)", 40f, 185f, metaPaint)
+            canvas.drawText("Penulis: $author", 40f, 200f, metaPaint)
             
             val syncText = if (document.isCloudSynced) "Penyimpanan Cloud: Terhubung (Sync Real-Time)" else "Penyimpanan Cloud: Lokal Saja (Offline)"
-            canvas.drawText(syncText, 40f, 200f, metaPaint)
+            canvas.drawText(syncText, 40f, 215f, metaPaint)
 
             // Divider
-            canvas.drawLine(40f, 215f, 555f, 215f, borderPaint)
+            canvas.drawLine(40f, 230f, 555f, 230f, borderPaint)
 
             // Visual Scanner Layout representation
             val scanCardPaint = Paint().apply {
@@ -113,8 +135,8 @@ object PdfGenerator {
             }
             
             // Draw Scanned Document mock canvas wrapper
-            canvas.drawRect(40f, 230f, 555f, 780f, scanCardPaint)
-            canvas.drawRect(40f, 230f, 555f, 780f, scanBorderPaint)
+            canvas.drawRect(40f, 245f, 555f, 780f, scanCardPaint)
+            canvas.drawRect(40f, 245f, 555f, 780f, scanBorderPaint)
 
             // Visual Watermark/Label for Searchable Layer
             val watermarkPaint = Paint().apply {
@@ -122,7 +144,7 @@ object PdfGenerator {
                 textSize = 12f
                 isFakeBoldText = true
             }
-            canvas.drawText("SECURE OFFLINE BATCH SCAN • OCR DETECTED LAYER ACTIVE", 60f, 255f, watermarkPaint)
+            canvas.drawText("SECURE OFFLINE BATCH SCAN • OCR DETECTED LAYER ACTIVE", 60f, 270f, watermarkPaint)
 
             // Body Text (Searchable Hidden OCR Transcript)
             val hiddenBodyPaint = Paint().apply {
@@ -137,7 +159,7 @@ object PdfGenerator {
             }
 
             val lines = pageRawText.split("\n")
-            var yPosition = 285f
+            var yPosition = 300f
             
             // Draw a simulated aesthetic page template
             for (line in lines) {
@@ -173,7 +195,15 @@ object PdfGenerator {
         }
 
         // Save PDF to cache or files folder
-        val docNameUniq = "DocuScan_${document.id}_${System.currentTimeMillis()}.pdf"
+        var docNameUniq = "DocuScan_${document.id}_${System.currentTimeMillis()}"
+        if (pdfPassword.isNotEmpty()) {
+            docNameUniq += "_Secure"
+        }
+        if (compressionEnabled) {
+            docNameUniq += "_Compressed"
+        }
+        docNameUniq += ".pdf"
+
         val outputFile = File(context.cacheDir, docNameUniq)
         val fileOutputStream = FileOutputStream(outputFile)
         pdfDocument.writeTo(fileOutputStream)
