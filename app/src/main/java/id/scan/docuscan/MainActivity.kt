@@ -1385,15 +1385,33 @@ fun DocumentItemCard(
                 }
 
                 // Cloud Status (Syncing / Synced / Offline)
-                val cloudIcon = if (document.isCloudSynced) Icons.Default.Done else Icons.Default.Warning
-                val cloudTint = if (document.isCloudSynced) Color(0xFF10B981) else Color.Gray
+                val (cloudIcon, cloudTint, statusText) = when {
+                    document.isCloudSynced -> Triple(Icons.Default.Check, Color(0xFF10B981), "Synced")
+                    document.isOfflineModified -> Triple(Icons.Default.Refresh, Color(0xFF3B82F6), "Syncing")
+                    else -> Triple(Icons.Default.Warning, Color(0xFFF59E0B), "Offline")
+                }
 
-                Icon(
-                    imageVector = cloudIcon,
-                    contentDescription = if (document.isCloudSynced) "Synced to Cloud" else "Offline",
-                    tint = cloudTint,
-                    modifier = Modifier.size(18.dp)
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(cloudTint.copy(alpha = 0.12f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Icon(
+                        imageVector = cloudIcon,
+                        contentDescription = statusText,
+                        tint = cloudTint,
+                        modifier = Modifier.size(12.dp)
+                    )
+                    Text(
+                        text = statusText,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = cloudTint
+                    )
+                }
             }
         }
     }
@@ -2086,30 +2104,55 @@ fun PostScanPreviewScreen(viewModel: ScannerViewModel) {
             }
         }
 
-        Button(
-            onClick = {
-                viewModel.startDocumentScanCapture(context) {
-                    viewModel.currentScreen = ActiveScreen.DASHBOARD
-                }
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp)
-                .testTag("execute_scan_button"),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary
-            ),
-            shape = RoundedCornerShape(8.dp),
-            enabled = !viewModel.isScanningModeActive
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Icon(Icons.Default.Check, null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "SIMPAN PEMINDAIAN",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace
-            )
+            OutlinedButton(
+                onClick = { 
+                    viewModel.currentScreen = ActiveScreen.SCAN_CAMERA 
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp),
+                shape = RoundedCornerShape(8.dp),
+                enabled = !viewModel.isScanningModeActive
+            ) {
+                Icon(Icons.Default.Close, null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "BATAL",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+
+            Button(
+                onClick = {
+                    viewModel.startDocumentScanCapture(context) {
+                        viewModel.currentScreen = ActiveScreen.DASHBOARD
+                    }
+                },
+                modifier = Modifier
+                    .weight(1.5f)
+                    .height(48.dp)
+                    .testTag("execute_scan_button"),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                ),
+                shape = RoundedCornerShape(8.dp),
+                enabled = !viewModel.isScanningModeActive
+            ) {
+                Icon(Icons.Default.Check, null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "SIMPAN PEMINDAIAN",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
         }
     }
 }
