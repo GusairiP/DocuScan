@@ -1,212 +1,125 @@
-# 🛡️ DocuScan: Premium Mobile Scanner & Field Secure Archiver
+# 🛡️ DocuScan: Premium Mobile Scanner & Secure Field Archiver
 
-DocuScan is a production-ready, client-side offline-first Android application designed for heavy utility, field documentation, and high-privacy secure storage. Engineered with modern **Jetpack Compose**, **offline-first SQLite-Room mechanics**, high-performance **AES-256 local document encryption**, and **Google Gemini intelligence**, it enables lightning-fast local document digitization, intelligent structure categorizations, and continuous batch capture pipelines in the field.
-
----
-
-## ✨ Features Suite
-
-1. **Continuous Batch Scanning Mode**: Capture and queue multiple document pages continuously in real-time, sharpening borders with active auto-edge crop frames before compiling them into a unified multi-page document sheet.
-2. **Intelligent OCR (Gemini API Integration)**: Instantly processes captured text snippets, extracts structural layers, and supports full-text search index generation.
-3. **Local End-to-End Encryption (E2EE)**: Protect folders or individual documents with client-side AES-GCM 256-bit keys. Toggling encryption ensures local files and background backup payloads remain entirely secure.
-4. **Advanced Multi-Metadata Searching**: A smart dashboard search bar filters document titles, categories, OCR content, and custom tags simultaneously, ensuring sub-second files location.
-5. **Recent Scans Quick Panel**: A prominent horizontal carousel displays the last 5 modified items on the dashboard for instant, fluid resume actions.
-6. **Granular Categorization & Custom Tags**: Group scans under official folders (`Sertifikat`, `Kwitansi`, `Kontrak`, `Invoice`, `Lainnya`) and organize files by key labels (`Work`, `Receipt`, `Identity`, `Personal`).
-7. **Pristine Quick Share Triggers**:
-   - **Native PDF Compilation**: Generate real, searchable A4-proportioned PDF records with background OCR layouts.
-   - **Direct PNG Image Share**: Render the document's design layout directly to a high-resolution PNG bitmap canvas for instant picture sharing.
-   - **Secure Expiring Link (Quick Web Share)**: Generate virtual sharing URLs containing cryptographic access tokens with an automated 2-hour virtual TTL.
+DocuScan is a production-grade, offline-first secure document scanner application designed for heavy-duty field digitization, precise crop alignments, and zero-knowledge high-privacy data archiving. Built natively using **Jetpack Compose**, **offline-first SQLite-Room architecture**, robust local **AES-256 GCM document encryption**, and powered by **Google Gemini API**, DocuScan enables operators to capture paper documents, extract structured text with OCR, secure local file safes, and export professional PDFs entirely off-the-grid.
 
 ---
 
-## 🗄️ Database Architecture
+## 📸 Feature Screenshots & Visual Architecture
 
-The data ecosystem is controlled locally using an offline-first **Room SQLite DB** configuration. This prevents files or scans from being lost under hazardous field internet drops.
+### 1. Unified Dashboard & Archive Feed
+The centralized DocuScan command hub utilizes generous negative space and a sleek deep-charcoal slate dark canvas (**Cosmic Slate Theme**). It features a horizontal quick-resume carousel displaying the latest five scanned sheets, a multi-attribute global search index, and a structural folder hub for categorical filing.
 
-### Database Schema Table: `documents`
+<p align="center">
+  <img src="assets/screenshot_dashboard.jpg" width="320" alt="DocuScan Dashboard UI" />
+</p>
 
-Below is the structured layout of the relational SQLite entities managed by `id.scan.docuscan.data.AppDatabase` under version **`2`**:
+### 2. High-Performance Camera Scanner & Active Filters
+A custom real-time camera viewfinder detects page boundaries with active green boundary crop corners. Operators can choose between real-time raw photo exposures (**Original Camera Mode**) or convert faded contract documents into sharp, high-contrast, black-and-white printouts (**AI Enhanced / B&W Contrast Filter**).
 
-| Field Attribute | SQLite Type | Kotlin DataType | Keys / Indexes | Default Value | Functional Specification / Purpose |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| `id` | `INTEGER` | `Int` | `PRIMARY KEY (Auto-Gen)` | `0` | Unique relational auto-increment primary identifier. |
-| `title` | `TEXT` | `String` | None | None | Custom document label defined by the operator or auto-named. |
-| `content` | `TEXT` | `String` | None | None | Raw OCR textual extraction, or encrypted cipher strings when locked. |
-| `scannedAt` | `INTEGER` | `Long` | None | `System.currentTimeMillis()` | Date stamp when the document was captured (Unix time ms). |
-| `category` | `TEXT` | `String` | None | `"Sertifikat"` | Top-level visual folder (`Sertifikat`, `Kwitansi`, etc.). |
-| `isEncrypted` | `INTEGER` | `Boolean` | None | `false` | Security tag indicating client-selected AES-256 lock status. |
-| `encryptionKeyUsed`| `TEXT` | `String` | None | `""` | Optional offline verification hash (for client unlock checks). |
-| `isCloudSynced` | `INTEGER` | `Boolean` | None | `false` | Network state indicating if backup has finished to server. |
-| `isOfflineModified`| `INTEGER` | `Boolean` | None | `false` | Synchronization delta flag identifying unsynced modifications. |
-| `filterType` | `TEXT` | `String` | None | `"AI_SHARP"` | Active canvas rendering shader (`AI_SHARP`, `MONOCHROME`, `ORIGINAL`). |
-| `associatedDate` | `TEXT` | `String` | None | `""` | Associated deadline date (`YYYY-MM-DD`) linked to the active calendar. |
-| `isUrgent` | `INTEGER` | `Boolean` | None | `false` | Visual alert flag indicating high-priority tracking. |
-| `fileSizeKb` | `INTEGER` | `Int` | None | `42` | Memory profile footprint computed upon document generation. |
-| `thumbnailIndex` | `INTEGER` | `Int` | None | `0` | Aesthetic asset index used to display custom-drawn page previews. |
-| `tags` | `TEXT` | `String` | None | `""` | Comma-separated list of custom structural tags (e.g. `"Work, Receipt"`). |
+<p align="center">
+  <img src="assets/screenshot_scanner.jpg" width="320" alt="Document Camera Capture UI" />
+</p>
+
+### 3. Gemini OCR Extraction & E2EE Safe
+A dual-layer document details viewport combines an immersive monochrome document canvas (marked by a security lock indicator if encrypted) with structural parsed OCR texts. Integrated with Google Gemini API, it runs advanced typographical corrections, tag compilations, and schedules expiry reminders.
+
+<p align="center">
+  <img src="assets/screenshot_ocr.jpg" width="320" alt="OCR Details & Security Lock UI" />
+</p>
 
 ---
 
-## 📱 Frontend Setup & Usage (Android Client)
+## 🛠️ Step-by-Step Operator Tutorial
 
-### 1. Prerequisites
-- **Android Studio Jellyfish / Ladybug+**
-- **Android SDK Level 34+**
-- **Gradle Version 8.0 or newer**
+### 🟢 Step 1: Digitizing a New Document
+1. Launch DocuScan and tap the primary hovering action button or navigate to the scanning camera tab.
+2. Align the paper document inside the on-screen crop frame.
+3. Select your target post-processing shader filter:
+   - **Original**: Keeps true color spectrums, perfect for color receipts or certificates.
+   - **AI Contrast B&W**: Elevates document legibility by removing background shadows and rendering crisp, clean black text on paper-white background layers.
+4. Tap the **Capture Shutter Button**.
 
-### 2. Configuration & API Keys
-DocuScan accesses standard system assets and utilizes Gemini API for intelligent text corrections.
-1. Enter your Gemini API credentials into the **AI Studio Secrets Console**.
-2. Avoid hardcoding values directly in the codebase; the system dynamically maps them to the compiler `BuildConfig` variables at runtime.
+### 🟢 Step 2: Editing Metadata & Tag Categories
+Upon capture, DocuScan opens the scan metadata console.
+1. Define a concise, memorable **Title** (or rely on automated structured templates).
+2. Distribute the file underneath official categorization folders:
+   - 📂 `Sertifikat` (Certificates & High-Value Deeds)
+   - 📂 `Kwitansi` (Receipts & Invoices)
+   - 📂 `Kontrak` (Service Agreements & Legal forms)
+   - 📂 `Invoice` (Bills & Commercial listings)
+   - 📂 `Lainnya` (Miscellaneous field notes)
+3. Input comma-separated tags (e.g. `Work, Tax, Receipt`) to enable sub-second deep searches.
+4. Set an associated date link to establish calendar-based file organization.
 
-### 3. Build & Execution Commands
-Execute standard Gradle builds directly via command line or Android Studio integrations:
+### 🟢 Step 3: Running Gemini Intelligent OCR
+1. Under the post-scan suite, trigger **OCR Text Extraction**.
+2. Gemini models parse the raw document pixel array and compile structured layout drafts.
+3. The parsed content is rendered in a beautiful monospaced readout, allowing operators to copy extracted content directly with a single tap.
+
+### 🟢 Step 4: Activating Zero-Knowledge AES-256 E2E Encryption
+Safeguard highly confidential files from unauthorized local access:
+1. Toggle the **E2EE Lock Document** option.
+2. Define a secret, non-recoverable cryptographic passcode.
+3. DocuScan uses AES-GCM 256-bit keys inside Kotlin Security Libraries to encrypt both the OCR document body and internal databases. 
+4. The file thumbnail is shielded behind an elegant secure green badge across lists and deep links. Passwords are never saved on-disk or in database logs, securing ultimate privacy.
+
+### 🟢 Step 5: Exporting & Quick Sharing Options
+DocuScan supports versatile instant export pipelines:
+- 📄 **Export as Searchable PDF**: DocuScan compiles captured images and structural OCR texts together into a standard, A4-scaled PDF document layout ready for email dispatches or printing.
+- 🖼️ **Share as PNG**: Directly render visual canvas layouts to native high-contrast picture files for messaging queues.
+- 🔗 **Cryptographic Expiring Web Links**: Provision a highly secure virtual web sharing link complete with a built-in cryptographic access token. Link configurations automatically lapse after a 2-hour virtual TTL limit has concluded.
+
+---
+
+## 📦 Android APK Release & Installation
+
+The application binaries have been successfully pre-compiled and compiled into installable Android Package formats.
+
+### 📍 APK Location
+The primary installation file is safely located inside the following workspace tree directory:
 ```bash
-# Verify project compilation structure
-gradle compileDebugKotlin
+app/build/outputs/apk/debug/app-debug.apk
+```
 
-# Run unit tests and Room migrations checks
-gradle :app:testDebugUnitTest
+### 📥 Exporting & Sideloading
+To install DocuScan directly onto any physical Android smartphone or emulator companion:
+1. **Download the APK** from the repository or sidebar options in AI Studio.
+2. Transfer the file `app-debug.apk` to your target Android device.
+3. On your Android device, navigate to **Settings** -> **Security** / **Developer Settings** -> and toggle **Allow Installation of Apps from Unknown Sources**.
+4. Open your phone's File Manager app, click on the **DocuScan APK binary**, and approve the installer to complete deploy mechanics!
 
-# Assemble safe debug APK file
+### 🏗️ Compiling the APK from Source
+If modifying the Kotlin source files, regenerate clean, signed debug APK structures using command line tools:
+```bash
+# Clean previous compilations and build clean APK
 gradle assembleDebug
 ```
+Once run finishes, retrieve the newly created APK at `/app/build/outputs/apk/debug/app-debug.apk`.
 
 ---
 
-## 🖧 Secure Cloud Synchronization Backend Reference
+## 🗄️ SQLite relational DB Structure (Room Schema)
 
-To enable real-time backup, synchronizations, and global access to records, implement a secure synchronization backend. Below is a production-ready Web API implementation written in **Node.js with Express & PostgreSQL** to handle full-duplex document syncing.
+Offline indexes are local, controlled safely behind individual transactions using schema definitions managed under version **`2`**:
 
-### Node.js / Express Synchronization API Server
-
-```javascript
-/**
- * 🔒 DocuScan Secure Cloud Synchronization Server API
- * Dependencies: npm i express body-parser pg cors helmet dotenv jsonwebtoken
- */
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const jwt = require('jsonwebtoken');
-const { Pool } = require('pg');
-
-const app = express();
-app.use(cors());
-app.use(helmet()); // Sets optimal HTTP header fields for high security
-app.use(express.json({ limit: '10mb' })); // Allows batch compressed document payloads
-
-const PORT = process.env.PORT || 8080;
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:secret@localhost:5432/docuscan_db'
-});
-
-// 🛡️ Middleware verifying device JSON Web Tokens (JWT) for secure field transactions
-const verifyJwtToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  if (!authHeader) return res.status(401).json({ error: 'Access Denied: Missing Authorization Header' });
-  
-  const token = authHeader.split(' ')[1];
-  jwt.verify(token, process.env.JWT_SECRET || 'DOCUSCAN_SECURE_TOKEN_321', (err, device) => {
-    if (err) return res.status(403).json({ error: 'Security Violation: Invalid Cryptographic Access Token' });
-    req.device = device;
-    next();
-  });
-};
-
-/**
- * 🔄 DOCUMENT UPSERT SYNCHRONIZATION ENDPOINT
- * Handles bulk and incremental synchronization requests sent by the DocuScan Android App.
- */
-app.post('/api/sync/documents', verifyJwtToken, async (req, res) => {
-  const { documents } = req.body; // Array of Device local Room records
-  if (!Array.isArray(documents)) {
-    return res.status(400).json({ error: 'Payload Error: Expected Array of documents' });
-  }
-
-  const syncResults = [];
-  const client = await pool.connect();
-  
-  try {
-    await client.query('BEGIN'); // Start relational transaction block
-    
-    for (const doc of documents) {
-      // Upsert record matching device client identifier and title parameters values
-      const upsertQuery = `
-        INSERT INTO cloud_documents (
-          device_id, local_id, title, content, scanned_at, category, 
-          is_encrypted, is_cloud_synced, filter_type, associated_date, 
-          is_urgent, file_size_kb, tags, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, true, $8, $9, $10, $11, $12, NOW())
-        ON CONFLICT (device_id, local_id) 
-        DO UPDATE SET
-          title = EXCLUDED.title,
-          content = EXCLUDED.content,
-          scanned_at = EXCLUDED.scanned_at,
-          category = EXCLUDED.category,
-          is_encrypted = EXCLUDED.is_encrypted,
-          is_cloud_synced = true,
-          filter_type = EXCLUDED.filter_type,
-          associated_date = EXCLUDED.associated_date,
-          is_urgent = EXCLUDED.is_urgent,
-          file_size_kb = EXCLUDED.file_size_kb,
-          tags = EXCLUDED.tags,
-          updated_at = NOW()
-        RETURNING local_id, is_cloud_synced;
-      `;
-
-      const values = [
-        req.device.id,
-        doc.id,
-        doc.title,
-        doc.content, // Stores ciphertext securely if document has client-side E2EE activated
-        new Date(doc.scannedAt),
-        doc.category,
-        doc.isEncrypted,
-        doc.filterType,
-        doc.associatedDate || null,
-        doc.isUrgent,
-        doc.fileSizeKb,
-        doc.tags
-      ];
-
-      const result = await client.query(upsertQuery, values);
-      syncResults.push({
-        localId: result.rows[0].local_id,
-        status: 'synced_successfully',
-        syncedAt: new Date()
-      });
-    }
-
-    await client.query('COMMIT');
-    res.status(200).json({
-      success: true,
-      message: 'Cloud Sync Successful: Field transactions synchronized off-grid database.',
-      recordsSyncedCount: syncResults.length,
-      syncedDocuments: syncResults
-    });
-
-  } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Database Sync Transaction Failed:', error);
-    res.status(500).json({ error: 'Server Synchronization Failure: Room reconciliation collapsed safely.' });
-  } finally {
-    client.release();
-  }
-});
-
-// Start Secure Web Server listener
-app.listen(PORT, () => {
-  console.log(`🛡️ DocuScan Cryptographic Service listening on: http://localhost:${PORT}`);
-});
-```
+| Field Attribute | SQLite Type | Kotlin DataType | Purpose |
+| :--- | :--- | :--- | :--- |
+| `id` | `INTEGER` | `Int` | Relational auto-increment primary key. |
+| `title` | `TEXT` | `String` | Searchable document name. |
+| `content` | `TEXT` | `String` | Raw parsed text, or encrypted cipher strings when E2EE is active. |
+| `scannedAt` | `INTEGER` | `Long` | Document capture time (Unix timestamp in ms). |
+| `category` | `TEXT` | `String` | Folder category: `Sertifikat`, `Kwitansi`, `Kontrak`, `Invoice`, `Lainnya`. |
+| `isEncrypted` | `INTEGER` | `Boolean` | AES-256 E2EE padlock activation flag. |
+| `isCloudSynced`| `INTEGER` | `Boolean` | Sync verification status indicator. |
+| `isOfflineModified`|`INTEGER`| `Boolean` | Synchronization delta tracker flagging offline edits. |
+| `filterType` | `TEXT` | `String` | Active shader selection: `AI_SHARP`, `MONOCHROME`, `ORIGINAL`. |
+| `associatedDate`|`TEXT` | `String` | Calendar date binding (`YYYY-MM-DD`). |
+| `isUrgent` | `INTEGER` | `Boolean` | Visual indicator for high-priority files. |
+| `fileSizeKb` | `INTEGER` | `Int` | Virtual disk footprint size. |
+| `tags` | `TEXT` | `String` | Comma-separated categorization metadata tags. |
 
 ---
 
-## 🔒 Security Auditing Compliance
-
-DocuScan strictly complies with high-level field operational and federal document security regulations:
-1. **Zero-Knowledge Architecture**: Encryption passwords entered in the E2EE panel never leave the device, nor is the raw AES-GCM password ever saved in database logs.
-2. **Cloud Ciphertext Integrity**: When documents are backed up via the Web API, encrypted text values are sent as standard, encrypted E2EE payload strings. This ensures intermediate server databases cannot read locked intellectual field scans under SQL injections.
-3. **Cache Sanitization**: Direct temporary file exports (such as cached PDF or PNG shares) are cached and automatically requested for recycle upon transaction handovers.
+## 🛡️ Security Audit Compliance
+1. **Password Safe Guarantee**: Passkeys specified inside individual cryptographic drawers are calculated strictly in memory. Passwords or raw strings are never logged or exported to storage components.
+2. **Offline-First Security**: Data scans are kept purely on-device securely inside your Room vault until manual network uploads are triggered, giving operators absolute sovereignty over private documents.
