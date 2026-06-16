@@ -5,31 +5,15 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Show Files
+      - name: Debug Repository Structure
         run: |
           pwd
+          echo "==== ROOT ===="
           ls -la
-          find . -maxdepth 3 -type f
-
-      - name: Build APK
-        working-directory: DocuScan
-        run: |
-          chmod +x gradlew || true
-          ./gradlew assembleRelease
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release
-          path: DocuScan/app/build/outputs/apk/release/*.apk
+          echo "==== ALL FILES ===="
+          find . -maxdepth 4 -type f | sort
