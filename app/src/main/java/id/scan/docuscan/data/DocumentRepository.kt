@@ -29,4 +29,12 @@ class DocumentRepository(private val documentDao: DocumentDao) {
     suspend fun deleteById(id: Int) {
         documentDao.deleteDocumentById(id)
     }
+
+    suspend fun getDocumentsOlderThan(timestamp: Long): List<DocumentEntity> {
+        return documentDao.getDocumentsOlderThan(timestamp)
+    }
+
+    suspend fun deleteDocumentsOlderThan(timestamp: Long) {
+        documentDao.deleteDocumentsOlderThan(timestamp)
+    }
 }

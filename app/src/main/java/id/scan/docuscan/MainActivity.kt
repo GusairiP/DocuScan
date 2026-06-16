@@ -62,8 +62,11 @@ import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -76,8 +79,14 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MyApplicationTheme(darkTheme = viewModel.isDarkMode) {
-                // Main Container
-                Scaffold(
+                if (!viewModel.isAppUnlocked) {
+                    BiometricLockScreen(
+                        activity = this@MainActivity,
+                        onUnlock = { viewModel.isAppUnlocked = true }
+                    )
+                } else {
+                    // Main Container
+                    Scaffold(
                     modifier = Modifier
                         .fillMaxSize()
                         .testTag("main_scaffold"),
@@ -116,7 +125,142 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
+                } // end innerPadding
+            } // end else
+        } // end MyApplicationTheme
+    } // end setContent
+} // end onCreate
+} // end MainActivity class
+
+// ==========================================
+// ONBOARDING COACH MARK OVERLAY
+// ==========================================
+@Composable
+fun CoachMarkOverlay(
+    text: String,
+    alignment: Alignment,
+    offsetX: androidx.compose.ui.unit.Dp = 0.dp,
+    offsetY: androidx.compose.ui.unit.Dp = 0.dp,
+    onNext: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.6f))
+            .clickable { onNext() }
+    ) {
+        Box(
+            modifier = Modifier
+                .align(alignment)
+                .offset(x = offsetX, y = offsetY)
+                .padding(16.dp)
+                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
+                .padding(16.dp)
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = text,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = onNext,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onPrimary)
+                ) {
+                    Text("OK, Mengerti", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.ExtraBold)
                 }
+            }
+        }
+    }
+}
+
+// ==========================================
+// BIOMETRIC LOCK SCREEN
+// ==========================================
+@Composable
+fun BiometricLockScreen(activity: FragmentActivity, onUnlock: () -> Unit) {
+    val context = LocalContext.current
+    
+    // Automatically trigger biometric prompt on mount
+    LaunchedEffect(Unit) {
+        val executor = ContextCompat.getMainExecutor(context)
+        val biometricPrompt = BiometricPrompt(activity, executor,
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    super.onAuthenticationError(errorCode, errString)
+                    Toast.makeText(context, "Autentikasi gagal: $errString", Toast.LENGTH_SHORT).show()
+                }
+
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    super.onAuthenticationSucceeded(result)
+                    Toast.makeText(context, "Akses diberikan", Toast.LENGTH_SHORT).show()
+                    onUnlock()
+                }
+
+                override fun onAuthenticationFailed() {
+                    super.onAuthenticationFailed()
+                    Toast.makeText(context, "Sidik jari / Wajah tidak dikenali", Toast.LENGTH_SHORT).show()
+                }
+            })
+
+        val promptInfo = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("DocuScan Security Lock")
+            .setSubtitle("Autentikasi Biometrik wajib dilakukan")
+            .setAllowedAuthenticators(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG or androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL)
+            .build()
+
+        biometricPrompt.authenticate(promptInfo)
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                imageVector = Icons.Default.Lock,
+                contentDescription = "App Locked",
+                modifier = Modifier.size(64.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "DocuScan Terkunci",
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Mohon verifikasi biometrik Anda untuk mengakses dokumen.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 14.sp
+            )
+            Spacer(modifier = Modifier.height(32.dp))
+            Button(onClick = {
+                val executor = ContextCompat.getMainExecutor(context)
+                val biometricPrompt = BiometricPrompt(activity, executor,
+                    object : BiometricPrompt.AuthenticationCallback() {
+                        override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                            super.onAuthenticationSucceeded(result)
+                            onUnlock()
+                        }
+                    })
+
+                val promptInfo = BiometricPrompt.PromptInfo.Builder()
+                    .setTitle("DocuScan Security Lock")
+                    .setSubtitle("Autentikasi Biometrik wajib dilakukan")
+                    .setAllowedAuthenticators(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG or androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL)
+                    .build()
+
+                biometricPrompt.authenticate(promptInfo)
+            }) {
+                Text("Buka Kunci Ulang")
             }
         }
     }
@@ -430,6 +574,44 @@ fun DashboardScreen(viewModel: ScannerViewModel) {
                                         .padding(horizontal = 4.dp, vertical = 2.dp)
                                 )
                             }
+                        }
+                    }
+                }
+            }
+            
+            // Automated storage management alert
+            if (viewModel.oldDocumentsCount > 0) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                "Manajemen Penyimpanan Otomatis",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                        Text(
+                            text = "Ada ${viewModel.oldDocumentsCount} dokumen pindaian yang usianya lebih dari 90 hari. Untuk menjaga performa aplikasi tetap optimal, Anda dapat menghapus/mengarsipkannya.",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Button(
+                            onClick = { viewModel.cleanUpOldDocuments() },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                            modifier = Modifier.fillMaxWidth().height(40.dp)
+                        ) {
+                            Text("Bersihkan Sekarang", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onError)
                         }
                     }
                 }
@@ -856,6 +1038,16 @@ fun DashboardScreen(viewModel: ScannerViewModel) {
         ) {
             Icon(Icons.Default.Add, "Pindai Dokumen Baru")
         }
+
+        if (viewModel.onboardingStep == 1) {
+            CoachMarkOverlay(
+                text = "Ketuk di sini untuk mulai melakukan Batch Scan & deteksi batas otomatis!",
+                alignment = Alignment.BottomEnd,
+                offsetX = (-16).dp,
+                offsetY = (-80).dp,
+                onNext = { viewModel.completeOnboardingStep() }
+            )
+        }
     }
 }
 
@@ -1195,19 +1387,20 @@ fun CameraScannerScreen(viewModel: ScannerViewModel) {
         return TranslationHelper.translate(viewModel.appLanguage, key)
     }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .testTag("camera_scanner_screen"),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .testTag("camera_scanner_screen"),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                 Text(
                     text = getLangText("camera_title"),
                     fontSize = 13.sp,
@@ -2105,9 +2298,18 @@ fun CameraScannerScreen(viewModel: ScannerViewModel) {
                     )
                 }
             }
-        }
+        } // close item
+    } // close LazyColumn
+
+    if (viewModel.onboardingStep == 2) {
+        CoachMarkOverlay(
+            text = "Arahkan kamera ke dokumen. AI akan mendeteksi batas tepi (Edge Detection) secara otomatis dan mengambil beberapa pemindaian sekaligus dalam Batch Scan.",
+            alignment = Alignment.Center,
+            onNext = { viewModel.completeOnboardingStep() }
+        )
     }
-}
+} // close Box
+} // close CameraScannerScreen
 
 // ==========================================
 // SCREEN 3: DOCUMENT DETAILS & INTEGRATION CIPHER
@@ -3038,6 +3240,95 @@ fun SettingsScreen(viewModel: ScannerViewModel) {
                     Icon(Icons.Default.Refresh, null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("Singkronisasikan Seluruh SQLite ke Server", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        // Multi-Language OCR Pack Selection
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text("Pemrosesan Bahasa OCR Tesseract", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    "Pilih modul bahasa ekstraksi teks (Language Pack) untuk meningkatkan akurasi OCR saat pemindaian dokumen.",
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                val languageOptions = listOf("Indonesian", "English", "French")
+                Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    languageOptions.forEach { lang ->
+                        val isSelected = viewModel.ocrLanguage == lang
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { viewModel.updateOcrLanguage(lang) },
+                            label = { Text(lang, fontSize = 11.sp) },
+                            leadingIcon = if (isSelected) {
+                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                            } else null
+                        )
+                    }
+                }
+            }
+        }
+
+        // App Security & Backup Preferences Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text("Privasi Tambahan & Pencadangan", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+
+                // Biometric Toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Kunci Biometrik / FaceID App", fontSize = 12.sp)
+                        Text("Minta verifikasi biometrik saat membuka DocuScan", fontSize = 9.sp, color = Color.Gray)
+                    }
+                    Switch(
+                        checked = viewModel.isBiometricEnabled,
+                        onCheckedChange = { viewModel.updateBiometricSetting(it) }
+                    )
+                }
+
+                // Wi-Fi Only Sync
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Sinkronisasi Cloud Wi-Fi Saja", fontSize = 12.sp)
+                        Text("Hemat kuota data seluler saat mencadangkan dokumen", fontSize = 9.sp, color = Color.Gray)
+                    }
+                    Switch(
+                        checked = viewModel.cloudSyncWifiOnly,
+                        onCheckedChange = { viewModel.updateCloudSyncWifiOnly(it) }
+                    )
+                }
+
+                // Backup Frequency Dropdown Sim
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text("Frekuensi Pencadangan Lokal Otomatis", fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    val frequencies = listOf("Setiap Jam", "Harian", "Mingguan", "Manual Saja")
+                    Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        frequencies.forEach { freq ->
+                            val isSelected = viewModel.backupFrequency == freq
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { viewModel.updateBackupFrequency(freq) },
+                                label = { Text(freq, fontSize = 11.sp) }
+                            )
+                        }
+                    }
                 }
             }
         }

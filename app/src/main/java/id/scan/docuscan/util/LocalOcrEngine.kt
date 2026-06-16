@@ -28,14 +28,16 @@ object LocalOcrEngine {
         title: String,
         category: String,
         isAiSharpened: Boolean,
+        language: String = "Indonesian",
         onProgressLog: (String, Float) -> Unit
     ): String {
-        Log.d(TAG, "Starting Local Tesseract-style OCR processing for: $title")
+        Log.d(TAG, "Starting Local Tesseract-style OCR processing for: $title with $language")
         
         // Progress through detailed Tesseract-style compilation steps
-        for (i in ocrSteps.indices) {
-            val progress = (i + 1).toFloat() / ocrSteps.size
-            onProgressLog(ocrSteps[i], progress)
+        val localizedSteps = ocrSteps.map { if (it.contains("Indonesian")) it.replace("Indonesian", language) else it }
+        for (i in localizedSteps.indices) {
+            val progress = (i + 1).toFloat() / localizedSteps.size
+            onProgressLog(localizedSteps[i], progress)
             delay(280) // Smooth progress feel
         }
 

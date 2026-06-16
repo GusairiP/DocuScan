@@ -28,4 +28,10 @@ interface DocumentDao {
 
     @Query("SELECT COUNT(*) FROM documents")
     fun countDocumentsFlow(): Flow<Int>
+
+    @Query("SELECT * FROM documents WHERE scannedAt < :timestamp")
+    suspend fun getDocumentsOlderThan(timestamp: Long): List<DocumentEntity>
+
+    @Query("DELETE FROM documents WHERE scannedAt < :timestamp")
+    suspend fun deleteDocumentsOlderThan(timestamp: Long)
 }

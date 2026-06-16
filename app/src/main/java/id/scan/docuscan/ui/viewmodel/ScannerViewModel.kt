@@ -34,6 +34,67 @@ class ScannerViewModel(application: Application) : AndroidViewModel(application)
     private val database = AppDatabase.getDatabase(application)
     private val repository = DocumentRepository(database.documentDao())
 
+    val sharedPreferences = application.getSharedPreferences("docuscan_prefs", Context.MODE_PRIVATE)
+    
+    var isOnboardingComplete by mutableStateOf(sharedPreferences.getBoolean("isOnboardingComplete", false))
+    var onboardingStep by mutableStateOf(if (sharedPreferences.getBoolean("isOnboardingComplete", false)) -1 else 1)
+    
+    var isBiometricEnabled by mutableStateOf(sharedPreferences.getBoolean("isBiometricEnabled", false))
+    var backupFrequency by mutableStateOf(sharedPreferences.getString("backupFrequency", "Daily") ?: "Daily")
+    var cloudSyncWifiOnly by mutableStateOf(sharedPreferences.getBoolean("cloudSyncWifiOnly", true))
+    var isAppUnlocked by mutableStateOf(!sharedPreferences.getBoolean("isBiometricEnabled", false))
+
+    // Multi-Language OCR Configuration
+    var ocrLanguage by mutableStateOf(sharedPreferences.getString("ocrLanguage", "Indonesian") ?: "Indonesian")
+    var oldDocumentsCount by mutableStateOf(0)
+
+    fun checkOldDocumentsCount() {
+        viewModelScope.launch {
+            val ninetyDaysAgo = System.currentTimeMillis() - (90L * 24 * 60 * 60 * 1000)
+            oldDocumentsCount = repository.getDocumentsOlderThan(ninetyDaysAgo).size
+        }
+    }
+
+    fun completeOnboardingStep() {
+        if (onboardingStep == 1) {
+            onboardingStep = 2
+        } else if (onboardingStep == 2) {
+            isOnboardingComplete = true
+            onboardingStep = -1
+            sharedPreferences.edit().putBoolean("isOnboardingComplete", true).apply()
+        }
+    }
+
+    fun updateBiometricSetting(enabled: Boolean) {
+        isBiometricEnabled = enabled
+        isAppUnlocked = true
+        sharedPreferences.edit().putBoolean("isBiometricEnabled", enabled).apply()
+    }
+
+    fun updateBackupFrequency(frequency: String) {
+        backupFrequency = frequency
+        sharedPreferences.edit().putString("backupFrequency", frequency).apply()
+    }
+
+    fun updateCloudSyncWifiOnly(wifiOnly: Boolean) {
+        cloudSyncWifiOnly = wifiOnly
+        sharedPreferences.edit().putBoolean("cloudSyncWifiOnly", wifiOnly).apply()
+    }
+
+    fun updateOcrLanguage(language: String) {
+        ocrLanguage = language
+        sharedPreferences.edit().putString("ocrLanguage", language).apply()
+    }
+
+    fun cleanUpOldDocuments() {
+        viewModelScope.launch {
+            val ninetyDaysAgo = System.currentTimeMillis() - (90L * 24 * 60 * 60 * 1000)
+            repository.deleteDocumentsOlderThan(ninetyDaysAgo)
+            oldDocumentsCount = 0
+            checkOldDocumentsCount()
+        }
+    }
+
     // UI Configuration & Dark Mode
     var isDarkMode by mutableStateOf(true)
         private set
@@ -184,6 +245,7 @@ class ScannerViewModel(application: Application) : AndroidViewModel(application)
     init {
         // Seed default template data if the database is completely empty
         viewModelScope.launch {
+            checkOldDocumentsCount()
             repository.totalDocumentsCount.first().let { count ->
                 if (count == 0) {
                     seedDefaultDocuments()
@@ -276,7 +338,8 @@ class ScannerViewModel(application: Application) : AndroidViewModel(application)
             val ocrText = id.scan.docuscan.util.LocalOcrEngine.performLocalOcr(
                 title = scanTitle,
                 category = scanCategory,
-                isAiSharpened = (scanFilterType == "AI_SHARP")
+                isAiSharpened = (scanFilterType == "AI_SHARP"),
+                language = ocrLanguage
             ) { log, prog ->
                 ocrProgressLog = log
                 scanningProgress = 0.4f + (prog * 0.6f) // Maps local progress to final 40% - 100% block
