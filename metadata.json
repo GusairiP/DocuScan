@@ -1,0 +1,6 @@
+{
+  "name": "DocuScan",
+  "description": "Minimalist Document Scanner with OCR, E2E Encryption, Real-time Cloud Sync, and Offline Local Persistence",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

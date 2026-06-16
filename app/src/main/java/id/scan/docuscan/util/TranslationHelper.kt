@@ -1,0 +1,146 @@
+package id.scan.docuscan.util
+
+object TranslationHelper {
+    const val CONTRIBUTION_LINK = "https://github.com/idscan/docuscan-translations"
+    const val INSTRUCTIONS_LINK = "https://github.com/idscan/docuscan-translations/blob/main/GUIDE.md"
+
+    val AVAILABLE_LANGUAGES = listOf(
+        LanguageInfo("id", "Bahasa Indonesia", "🇮🇩"),
+        LanguageInfo("en", "English", "🇺🇸"),
+        LanguageInfo("es", "Español", "🇪🇸"),
+        LanguageInfo("ja", "日本語", "🇯🇵")
+    )
+
+    data class LanguageInfo(val code: String, val name: String, val flag: String)
+
+    val translations = mapOf(
+        "id" to mapOf(
+            "app_title" to "DocuScan Lapangan",
+            "dashboard_subtitle" to "Sistem Pindai & Enkripsi Offline-First",
+            "camera_title" to "PEMINDAIAN KAMERA LAPANGAN AI",
+            "scanned_docs" to "Dokumen Terpindai",
+            "cloud_storage" to "Penyimpanan Cloud",
+            "docs_list" to "DAFTAR BERKAS DOKUMEN",
+            "search_placeholder" to "Cari dokumen (judul atau kategori)...",
+            "all" to "Semua",
+            "scan_title_label" to "1. Judul Dokumen (Metadata)",
+            "scan_title_hint" to "Nama Dokumen (Contoh: Kwitansi Belanja, Adendum Kontrak)",
+            "scan_category_label" to "2. Pilih Kategori Folder",
+            "scan_filter_label" to "3. Peningkatan Hasil Scan (AI Filter)",
+            "scan_filter_hint" to "Teknologi filter mempertajam tepi teks menjamin tulisan terbaca sempurna.",
+            "scan_security_label" to "Opsi Privasi & Enkripsi AES-GCM",
+            "scan_encrypt_checkbox" to "Aktifkan Enkripsi End-to-End pada File",
+            "scan_passkey_label" to "Kunci Enkripsi (Gunakan saat mengekstrak PDF)",
+            "scan_passkey_hint" to "Minimal 4 karakter...",
+            "scan_urgent_checkbox" to "Tandai sebagai DOKUMEN MENDESAK (Urgensi Tinggi)",
+            "button_scan" to "AMBIL GAMBAR & PROSES OCR",
+            "button_scanning" to "MENYELESAIKAN PROSES SCAN...",
+            "ad_title" to "Cadangan Cloud Premium",
+            "ad_desc" to "Otomatis, aman & tak terbatas. Cadangkan rekam scan Anda dengan enkripsi end-to-end.",
+            "contribution_title" to "Proyek Terjemahan Global",
+            "contribution_desc" to "Bantu melokalkan DocuScan untuk tim lapangan Anda di seluruh dunia.",
+            "contribution_button" to "Kontribusi Terjemahan",
+            "help_translate" to "Saran Terjemahan",
+            "ocr_overlay_detected" to "DETEKSI TEPI PERMUKAAN DOKUMEN",
+            "ocr_overlay_adjust" to "SUDUT DETEKSI SELESAI • KETUK/SESUAIKAN",
+            "scan_guide" to "Arahkan kamera ke dokumen secara tegak lurus"
+        ),
+        "en" to mapOf(
+            "app_title" to "DocuScan Mobile",
+            "dashboard_subtitle" to "Offline-First Scan & Encrypt System",
+            "camera_title" to "AI FIELD CAMERA SCANNER",
+            "scanned_docs" to "Docs Scanned",
+            "cloud_storage" to "Cloud Storage",
+            "docs_list" to "SAMPLED DOCUMENT REPOSITORY",
+            "search_placeholder" to "Search documents (title or category)...",
+            "all" to "All",
+            "scan_title_label" to "1. Document Metadata Title",
+            "scan_title_hint" to "Document name (e.g., Shopping Receipt, Contract Amendment)",
+            "scan_category_label" to "2. Select Folder Category",
+            "scan_filter_label" to "3. Texture Enhancement (AI Filter)",
+            "scan_filter_hint" to "Filter technology sharpens text boundaries ensuring ultimate readability.",
+            "scan_security_label" to "AES-GCM Privacy & Encryption Options",
+            "scan_encrypt_checkbox" to "Enable End-to-End Encryption on File",
+            "scan_passkey_label" to "Custom Passkey (Required to decrypt PDF later)",
+            "scan_passkey_hint" to "Min 4 characters recommended...",
+            "scan_urgent_checkbox" to "Flag as URGENT DOCUMENT (High Priority)",
+            "button_scan" to "TAKE SOURCE CAPTURE & PROCESS OCR",
+            "button_scanning" to "COMPILING SCAN TRACE...",
+            "ad_title" to "Premium Cloud Protect",
+            "ad_desc" to "Automatic, safe & unlimited. Secure your scanned registers with AES encryption.",
+            "contribution_title" to "Global Translation Project",
+            "contribution_desc" to "Help translate DocuScan for your regional teamwork units globally.",
+            "contribution_button" to "Contribute Translation",
+            "help_translate" to "Contribute Translations",
+            "ocr_overlay_detected" to "DOCUMENT SURFACE EDGE DETECTION",
+            "ocr_overlay_adjust" to "BOUNDARIES DETECTED • TOUCH TO MANIPULATE",
+            "scan_guide" to "Align camera directly perpendicular to the text"
+        ),
+        "es" to mapOf(
+            "app_title" to "DocuScan Móvil",
+            "dashboard_subtitle" to "Sistema de Escaneo Encriptado Local",
+            "camera_title" to "ESCANEO POR CÁMARA DE CAMPO AI",
+            "scanned_docs" to "Docs Escaneados",
+            "cloud_storage" to "Nube Almacenamiento",
+            "docs_list" to "REPOSITORIO DE DOCUMENTOS",
+            "search_placeholder" to "Buscar documentos (título o categoría)...",
+            "all" to "Todos",
+            "scan_title_label" to "1. Título Metadato de Archivo",
+            "scan_title_hint" to "Ejemplo: Recibo de Compra, Enmienda Contractual",
+            "scan_category_label" to "2. Seleccionar Categoría",
+            "scan_filter_label" to "3. Realce de Contraste (Filtro AI)",
+            "scan_filter_hint" to "La tecnología de enfoque resalta las letras garantizando el escaneo claro.",
+            "scan_security_label" to "Opciones de Privacidad AES-GCM",
+            "scan_encrypt_checkbox" to "Habilitar Encriptación Completa",
+            "scan_passkey_label" to "Contraseña de Desencriptado (Requerido para PDF)",
+            "scan_passkey_hint" to "Mínimo 4 caracteres...",
+            "scan_urgent_checkbox" to "Documento de ALTA PRIORIDAD",
+            "button_scan" to "CAPTURAR FOTO Y EJECUTAR OCR",
+            "button_scanning" to "LOCALIZANDO CAPAS DE TEXTO...",
+            "ad_title" to "Nube Premium Ilimitado",
+            "ad_desc" to "Seguro y automático. Respalde sus escaneos confidenciales mediante encriptación.",
+            "contribution_title" to "Proyecto de Traducción",
+            "contribution_desc" to "Ayude a traducir para mejorar las operaciones de sus agentes en terreno.",
+            "contribution_button" to "Contribuir Traducción",
+            "help_translate" to "Contribuir Traducciones",
+            "ocr_overlay_detected" to "DETECCIÓN AUTOMÁTICA DE BORDES",
+            "ocr_overlay_adjust" to "BORDES ENCONTRADOS • TOQUE PARA AJUSTAR",
+            "scan_guide" to "Sostenga la cámara de manera paralela al papel"
+        ),
+        "ja" to mapOf(
+            "app_title" to "DocuScan モバイル",
+            "dashboard_subtitle" to "高セキュア自動オフラインOCR",
+            "camera_title" to "AI フィールドカメラスキャナー",
+            "scanned_docs" to "読み取り資料",
+            "cloud_storage" to "クラウド容量",
+            "docs_list" to "保存済みドキュメント一覧",
+            "search_placeholder" to "文書を検索 (タイトルまたはカテゴリ)...",
+            "all" to "すべて",
+            "scan_title_label" to "1. 文書メタデータ（タイトル入力）",
+            "scan_title_hint" to "タイトル名 (例: 消耗品領収書、契約合意書)",
+            "scan_category_label" to "2. フォルダカテゴリ選択",
+            "scan_filter_label" to "3. 画質補正（AI輪郭鮮明化フィルター）",
+            "scan_filter_hint" to "フィルター処理で文字のコントラストを修復し、視認性を最大化します。",
+            "scan_security_label" to "AES-GCM 暗号化 & プライバシー保護",
+            "scan_encrypt_checkbox" to "ファイルのエンドツーエンド暗号化を適用する",
+            "scan_passkey_label" to "プライベート暗号鍵 (PDF出力時に必要)",
+            "scan_passkey_hint" to "4文字以上のセキュリティ鍵推奨...",
+            "scan_urgent_checkbox" to "優先度：最重要資料マーク (現場巡回)",
+            "button_scan" to "画像を保存してローカルOCR解析",
+            "button_scanning" to "文字レイヤー解析を検索中...",
+            "ad_title" to "プレミアム・クラウドバックアップ",
+            "ad_desc" to "全自動・安全・制限なし。スキャン結果を即座に安全性の高い暗号形式で保管。",
+            "contribution_title" to "翻訳プロジェクト",
+            "contribution_desc" to "お使いの地域の運用部隊向けに本ツールのローカライズ作業へご協力ください。",
+            "contribution_button" to "翻訳に貢献する",
+            "help_translate" to "翻訳に協力する",
+            "ocr_overlay_detected" to "リアルタイム文書外枠エッジ検出",
+            "ocr_overlay_adjust" to "検出完了・ドラッグで補正可能",
+            "scan_guide" to "カメラを書類に対して垂直に向けてください"
+        )
+    )
+
+    fun translate(lang: String, key: String): String {
+        return translations[lang]?.get(key) ?: translations["en"]?.get(key) ?: key
+    }
+}

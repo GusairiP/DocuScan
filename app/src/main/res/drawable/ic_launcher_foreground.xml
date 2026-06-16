@@ -1,0 +1,55 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Top-left L bracket -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M38,26 H28 C26.9,26 26,26.9 26,28 V38 C26,39.1 26.9,40 28,40 C29.1,40 30,39.1 30,38 V30 H38 C39.1,30 40,29.1 40,28 C40,26.9 39.1,26 38,26 Z"/>
+        
+    <!-- Top-right L bracket -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M80,26 H70 C68.9,26 68,26.9 68,28 C68,29.1 68.9,30 70,30 H78 V38 C78,39.1 78.9,40 80,40 C81.1,40 82,39.1 82,38 V28 C82,26.9 81.1,26 80,26 Z"/>
+        
+    <!-- Bottom-left L bracket -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M28,82 H38 C39.1,82 40,81.1 40,80 C40,78.9 39.1,78 38,78 H30 V70 C30,68.9 29.1,68 28,68 C26.9,68 26,68.9 26,70 V80 C26,81.1 26.9,82 28,82 Z"/>
+        
+    <!-- Bottom-right L bracket -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M80,68 C78.9,68 78,68.9 78,70 V78 H70 C68.9,78 68,78.9 68,80 C68,81.1 68.9,82 70,82 H80 C81.1,82 82,81.1 82,80 V70 C82,68.9 81.1,68 80,68 Z"/>
+
+    <!-- Document Paper Base centered inside the safe area (width 32, height 40) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M40,34 H62 L68,40 V72 C68,73.1 67.1,74 66,74 H40 C38.9,74 38,73.1 38,72 V36 C38,34.9 38.9,34 40,34 Z"/>
+        
+    <!-- Folded corner overlay -->
+    <path
+        android:fillColor="#D8E2FF"
+        android:pathData="M62,34 V40 H68 Z"/>
+        
+    <!-- Text Lines inside local document -->
+    <path
+        android:fillColor="#005AC1"
+        android:pathData="M44,46 H62 C62.6,46 63,45.6 63,45 C63,44.4 62.6,44 62,44 H44 C43.4,44 43,44.4 43,45 C43,45.6 43.4,46 44,46 Z"/>
+    <path
+        android:fillColor="#44474E"
+        android:pathData="M44,52 H58 C58.6,52 59,51.6 59,51 C59,50.4 58.6,50 58,50 H44 C43.4,50 43,50.4 43,51 C43,51.6 43.4,52 44,52 Z"/>
+    <path
+        android:fillColor="#44474E"
+        android:pathData="M44,58 H62 C62.6,58 63,57.6 63,57 C63,56.4 62.6,56 62,56 H44 C43.4,56 43,56.4 43,57 C43,57.6 43.4,58 44,58 Z"/>
+    <path
+        android:fillColor="#44474E"
+        android:pathData="M44,64 H52 C52.6,64 53,63.6 53,63 C53,62.4 52.6,62 52,62 H44 C43.4,62 43,62.4 43,63 C43,63.6 43.4,64 44,64 Z"/>
+
+    <!-- Glowing scan laser horizontal bar across the document -->
+    <path
+        android:fillColor="#006622"
+        android:pathData="M24,53 H84 C84.6,53 85,53.4 85,54 C85,54.6 84.6,55 84,55 H24 C23.4,55 23,54.6 23,54 C23,53.4 23.4,53 24,53 Z"/>
+</vector>
