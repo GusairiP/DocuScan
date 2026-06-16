@@ -91,26 +91,30 @@ class MainActivity : FragmentActivity() {
                         .fillMaxSize()
                         .testTag("main_scaffold"),
                     bottomBar = {
-                        DocuScanBottomAppBar(
-                            currentScreen = viewModel.currentScreen,
-                            onNavigate = { screen ->
-                                viewModel.currentScreen = screen
-                                if (screen != ActiveScreen.DOC_DETAILS) {
-                                    viewModel.selectedDocument = null
+                        if (viewModel.currentScreen != ActiveScreen.SCAN_CAMERA) {
+                            DocuScanBottomAppBar(
+                                currentScreen = viewModel.currentScreen,
+                                onNavigate = { screen ->
+                                    viewModel.currentScreen = screen
+                                    if (screen != ActiveScreen.DOC_DETAILS) {
+                                        viewModel.selectedDocument = null
+                                    }
                                 }
-                            }
-                        )
+                            )
+                        }
                     }
                 ) { innerPadding ->
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .background(MaterialTheme.colorScheme.background)
-                            .padding(innerPadding)
+                            .padding(if (viewModel.currentScreen == ActiveScreen.SCAN_CAMERA) PaddingValues() else innerPadding)
                     ) {
                         Column(modifier = Modifier.fillMaxSize()) {
                             // High contrast minimalist branding bar
-                            DocuScanMainHeader(viewModel = viewModel)
+                            if (viewModel.currentScreen != ActiveScreen.SCAN_CAMERA) {
+                                DocuScanMainHeader(viewModel = viewModel)
+                            }
 
                             // Screen Routing
                             Box(modifier = Modifier.weight(1f)) {
@@ -1508,386 +1512,460 @@ fun CameraScannerScreen(viewModel: ScannerViewModel) {
         return TranslationHelper.translate(viewModel.appLanguage, key)
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .testTag("camera_scanner_screen"),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .testTag("camera_scanner_screen")
+    ) {
+        // Fullscreen Simulated camera viewport
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize()
         ) {
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+            val widthPx = constraints.maxWidth.toFloat()
+            val heightPx = constraints.maxHeight.toFloat()
+
+            // Calculate exact pixel points
+            val pxTL = Offset(displayTL.x * widthPx, displayTL.y * heightPx)
+            val pxTR = Offset(displayTR.x * widthPx, displayTR.y * heightPx)
+            val pxBR = Offset(displayBR.x * widthPx, displayBR.y * heightPx)
+            val pxBL = Offset(displayBL.x * widthPx, displayBL.y * heightPx)
+
+            // Background Preview Drawing: Skewed Paper Page on Desktop Background
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                // Draw simulated desk grid/texture
+                val gridPaint = PathEffect.dashPathEffect(floatArrayOf(12f, 18f), 0f)
+                for (i in 0..15) {
+                    val x = size.width * (i / 15f)
+                    drawLine(Color.DarkGray.copy(alpha = 0.25f), Offset(x, 0f), Offset(x, size.height), strokeWidth = 1.5f, pathEffect = gridPaint)
+                    val y = size.height * (i / 15f)
+                    drawLine(Color.DarkGray.copy(alpha = 0.25f), Offset(0f, y), Offset(size.width, y), strokeWidth = 1.5f, pathEffect = gridPaint)
+                }
+
+                // Draw Desk/Original Scan physical paper outline (slanted slightly)
+                // Expanded to handle larger fullscreen aspect ratio beautifully
+                val paperPath = Path().apply {
+                    moveTo(size.width * 0.15f, size.height * 0.20f)
+                    lineTo(size.width * 0.85f, size.height * 0.25f)
+                    lineTo(size.width * 0.88f, size.height * 0.78f)
+                    lineTo(size.width * 0.12f, size.height * 0.72f)
+                    close()
+                }
+                drawPath(paperPath, Color.White.copy(alpha = 0.12f))
+                drawPath(paperPath, Color.White.copy(alpha = 0.35f), style = Stroke(width = 3f))
+
+                // Draw decorative text lines on paper to look like a scanned document
+                val linePath = PathEffect.dashPathEffect(floatArrayOf(20f, 8f), 0f)
+                for (step in 1..12) {
+                    val yRatio = 0.23f + (step * 0.04f)
+                    drawLine(
+                        color = Color.LightGray.copy(alpha = 0.3f),
+                        start = Offset(size.width * 0.22f, size.height * yRatio),
+                        end = Offset(size.width * 0.78f, size.height * (yRatio + 0.008f)),
+                        strokeWidth = 3.5f,
+                        pathEffect = linePath
+                    )
+                }
+
+                // --- REALTIME EDGE DETECTION OVERLAY ---
+                // Draw outer dim mask: we clip outside the crop quadrilateral
+                val scanHighlightPath = Path().apply {
+                    moveTo(pxTL.x, pxTL.y)
+                    lineTo(pxTR.x, pxTR.y)
+                    lineTo(pxBR.x, pxBR.y)
+                    lineTo(pxBL.x, pxBL.y)
+                    close()
+                }
+
+                clipPath(scanHighlightPath, clipOp = ClipOp.Difference) {
+                    drawRect(Color.Black.copy(alpha = 0.55f))
+                }
+
+                // Draw the green crop bounding border
+                drawPath(
+                    path = scanHighlightPath,
+                    color = ScannerGlowGreen,
+                    style = Stroke(width = 5f)
+                )
+
+                // Fill interior crop shape with glowing green scanner filter
+                drawPath(
+                    path = scanHighlightPath,
+                    color = ScannerGlowGreen.copy(alpha = if (isManualCropMode) 0.11f else 0.20f)
+                )
+
+                // Draw HUD Targets / Focal Markers on Corners
+                drawCircle(Color.White, radius = 5f, center = pxTL)
+                drawCircle(Color.White, radius = 5f, center = pxTR)
+                drawCircle(Color.White, radius = 5f, center = pxBR)
+                drawCircle(Color.White, radius = 5f, center = pxBL)
+            }
+
+            // AI floating neon scanner laser line
+            val lineY = this.maxHeight * sweepPosition
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .offset(y = lineY)
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(Color.Transparent, ScannerGlowGreen, Color.Transparent)
+                        )
+                    )
+            )
+
+            // Drag handles for Manual Fine Tuning Mode
+            if (isManualCropMode) {
+                // TL Handle
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .offset(
+                            x = (this.maxWidth * tl.x) - 21.dp,
+                            y = (this.maxHeight * tl.y) - 21.dp
+                        )
+                        .pointerInput(Unit) {
+                            detectDragGestures { change, dragAmount ->
+                                change.consume()
+                                val newX = (tl.x + dragAmount.x / widthPx).coerceIn(0.01f, 0.48f)
+                                val newY = (tl.y + dragAmount.y / heightPx).coerceIn(0.01f, 0.48f)
+                                tl = Offset(newX, newY)
+                            }
+                        }
+                        .background(Color.White.copy(alpha = 0.25f), CircleShape)
+                        .border(2.5.dp, ScannerGlowGreen, CircleShape),
+                    contentAlignment = Alignment.Center
                 ) {
+                    Box(modifier = Modifier.size(10.dp).background(Color.White, CircleShape))
+                }
+
+                // TR Handle
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .offset(
+                            x = (this.maxWidth * tr.x) - 21.dp,
+                            y = (this.maxHeight * tr.y) - 21.dp
+                        )
+                        .pointerInput(Unit) {
+                            detectDragGestures { change, dragAmount ->
+                                change.consume()
+                                val newX = (tr.x + dragAmount.x / widthPx).coerceIn(0.52f, 0.99f)
+                                val newY = (tr.y + dragAmount.y / heightPx).coerceIn(0.01f, 0.48f)
+                                tr = Offset(newX, newY)
+                            }
+                        }
+                        .background(Color.White.copy(alpha = 0.25f), CircleShape)
+                        .border(2.5.dp, ScannerGlowGreen, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(modifier = Modifier.size(10.dp).background(Color.White, CircleShape))
+                }
+
+                // BR Handle
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .offset(
+                            x = (this.maxWidth * br.x) - 21.dp,
+                            y = (this.maxHeight * br.y) - 21.dp
+                        )
+                        .pointerInput(Unit) {
+                            detectDragGestures { change, dragAmount ->
+                                change.consume()
+                                val newX = (br.x + dragAmount.x / widthPx).coerceIn(0.52f, 0.99f)
+                                val newY = (br.y + dragAmount.y / heightPx).coerceIn(0.52f, 0.99f)
+                                br = Offset(newX, newY)
+                            }
+                        }
+                        .background(Color.White.copy(alpha = 0.25f), CircleShape)
+                        .border(2.5.dp, ScannerGlowGreen, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(modifier = Modifier.size(10.dp).background(Color.White, CircleShape))
+                }
+
+                // BL Handle
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .offset(
+                            x = (this.maxWidth * bl.x) - 21.dp,
+                            y = (this.maxHeight * bl.y) - 21.dp
+                        )
+                        .pointerInput(Unit) {
+                            detectDragGestures { change, dragAmount ->
+                                change.consume()
+                                val newX = (bl.x + dragAmount.x / widthPx).coerceIn(0.01f, 0.48f)
+                                val newY = (bl.y + dragAmount.y / heightPx).coerceIn(0.52f, 0.99f)
+                                bl = Offset(newX, newY)
+                            }
+                        }
+                        .background(Color.White.copy(alpha = 0.25f), CircleShape)
+                        .border(2.5.dp, ScannerGlowGreen, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(modifier = Modifier.size(10.dp).background(Color.White, CircleShape))
+                }
+            }
+        }
+
+        // --- OVERLAYS: HEADERS & HUD INFO (Absolute layers) ---
+
+        // Sleek Minimalist Top Header Overlay
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color.Black.copy(alpha = 0.75f), Color.Transparent)
+                    )
+                )
+                .statusBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Cancel Button to go back to Dashboard
+            Surface(
+                color = Color.Black.copy(alpha = 0.5f),
+                shape = CircleShape,
+                modifier = Modifier.size(40.dp)
+            ) {
+                IconButton(
+                    onClick = { viewModel.currentScreen = ActiveScreen.DASHBOARD }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Batal",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            // Screen/Camera Title
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = getLangText("camera_title"),
-                    fontSize = 13.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.ExtraBold,
                     fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.primary
+                    color = ScannerGlowGreen,
+                    letterSpacing = 1.sp
                 )
-                
-                // Reset button for edge detection bounds
+                Text(
+                    text = "AI REALTIME EDGE VIEWFINDER",
+                    fontSize = 8.sp,
+                    color = Color.LightGray.copy(alpha = 0.8f),
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+
+            // Reset bounds button
+            Surface(
+                color = Color.Black.copy(alpha = 0.5f),
+                shape = CircleShape,
+                modifier = Modifier.size(40.dp)
+            ) {
                 IconButton(
                     onClick = {
                         isManualCropMode = false
                         autoDetectTrigger++
-                    },
-                    modifier = Modifier.size(28.dp)
+                    }
                 ) {
                     Icon(
                         imageVector = Icons.Default.Refresh,
                         contentDescription = "Reset Bounds",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
         }
 
-        // Simulated camera frame with interactive boundary edge-detection overlay
-        item {
-            BoxWithConstraints(
+        // Sensor metadata floating badge (Middle top, under header)
+        Surface(
+            color = Color.Black.copy(alpha = 0.7f),
+            shape = RoundedCornerShape(20.dp),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .offset(y = 86.dp)
+                .border(0.5.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(20.dp))
+        ) {
+            Text(
+                text = "ISO Auto | F/2.4 | ${"%.1f".format(96.2f + sweepPosition * 2.5f)}% Edge Conf",
+                style = androidx.compose.ui.text.TextStyle(fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = Color.White),
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+            )
+        }
+
+        // Auto/Manual info guideline badge (Middle center)
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .offset(y = 180.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color.Black.copy(alpha = 0.75f))
+                .border(1.dp, if (isManualCropMode) ScannerGlowGreen.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                .padding(horizontal = 12.dp, vertical = 6.dp)
+        ) {
+            Text(
+                text = if (isManualCropMode) getLangText("ocr_overlay_adjust") else getLangText("ocr_overlay_detected"),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (isManualCropMode) ScannerGlowGreen else Color.LightGray,
+                textAlign = TextAlign.Center
+            )
+        }
+
+        // --- BOTTOM HUD MENU CONSOLE (Absolute aligned bottom) ---
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f), Color.Black)
+                    )
+                )
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Interactive Mode Selector UI overlay
+            Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(240.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color.Black)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color.White.copy(alpha = 0.1f))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                val widthPx = constraints.maxWidth.toFloat()
-                val heightPx = constraints.maxHeight.toFloat()
-
-                // Calculate exact pixel points
-                val pxTL = Offset(displayTL.x * widthPx, displayTL.y * heightPx)
-                val pxTR = Offset(displayTR.x * widthPx, displayTR.y * heightPx)
-                val pxBR = Offset(displayBR.x * widthPx, displayBR.y * heightPx)
-                val pxBL = Offset(displayBL.x * widthPx, displayBL.y * heightPx)
-
-                // Background Preview Drawing: Skewed Paper Page on Desktop Background
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    // Draw simulated desk grid/texture
-                    val gridPaint = PathEffect.dashPathEffect(floatArrayOf(8f, 12f), 0f)
-                    for (i in 0..10) {
-                        val x = size.width * (i / 10f)
-                        drawLine(Color.DarkGray.copy(alpha = 0.2f), Offset(x, 0f), Offset(x, size.height), strokeWidth = 1f, pathEffect = gridPaint)
-                        val y = size.height * (i / 10f)
-                        drawLine(Color.DarkGray.copy(alpha = 0.2f), Offset(0f, y), Offset(size.width, y), strokeWidth = 1f, pathEffect = gridPaint)
-                    }
-
-                    // Draw Desk/Original Scan physical paper outline (slanted slightly)
-                    val paperPath = Path().apply {
-                        moveTo(size.width * 0.20f, size.height * 0.18f)
-                        lineTo(size.width * 0.80f, size.height * 0.22f)
-                        lineTo(size.width * 0.84f, size.height * 0.80f)
-                        lineTo(size.width * 0.16f, size.height * 0.74f)
-                        close()
-                    }
-                    drawPath(paperPath, Color.White.copy(alpha = 0.15f))
-                    drawPath(paperPath, Color.White.copy(alpha = 0.4f), style = Stroke(width = 2f))
-
-                    // Draw decorative text lines on paper to look like a scanned document
-                    val linePath = PathEffect.dashPathEffect(floatArrayOf(15f, 6f), 0f)
-                    for (step in 1..8) {
-                        val yRatio = 0.18f + (step * 0.07f)
-                        drawLine(
-                            color = Color.LightGray.copy(alpha = 0.35f),
-                            start = Offset(size.width * 0.25f, size.height * yRatio),
-                            end = Offset(size.width * 0.75f, size.height * (yRatio + 0.01f)),
-                            strokeWidth = 3f,
-                            pathEffect = linePath
-                        )
-                    }
-
-                    // --- REALTIME EDGE DETECTION OVERLAY ---
-                    // Draw outer dim mask: we clip outside the crop quadrilateral
-                    val scanHighlightPath = Path().apply {
-                        moveTo(pxTL.x, pxTL.y)
-                        lineTo(pxTR.x, pxTR.y)
-                        lineTo(pxBR.x, pxBR.y)
-                        lineTo(pxBL.x, pxBL.y)
-                        close()
-                    }
-
-                    clipPath(scanHighlightPath, clipOp = ClipOp.Difference) {
-                        drawRect(Color.Black.copy(alpha = 0.5f))
-                    }
-
-                    // Draw the green crop bounding border
-                    drawPath(
-                        path = scanHighlightPath,
-                        color = ScannerGlowGreen,
-                        style = Stroke(width = 4f)
-                    )
-
-                    // Fill interior crop shape with glowing green scanner filter
-                    drawPath(
-                        path = scanHighlightPath,
-                        color = ScannerGlowGreen.copy(alpha = if (isManualCropMode) 0.12f else 0.22f)
-                    )
-
-                    // Draw HUD Targets / Focal Markers on Corners
-                    drawCircle(Color.White, radius = 4f, center = pxTL)
-                    drawCircle(Color.White, radius = 4f, center = pxTR)
-                    drawCircle(Color.White, radius = 4f, center = pxBR)
-                    drawCircle(Color.White, radius = 4f, center = pxBL)
+                // Auto Detect Tab Button
+                Button(
+                    onClick = {
+                        isManualCropMode = false
+                        autoDetectTrigger++
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (!isManualCropMode) ScannerGlowGreen else Color.Transparent,
+                        contentColor = if (!isManualCropMode) Color.Black else Color.White
+                    ),
+                    shape = RoundedCornerShape(16.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                    modifier = Modifier.height(32.dp)
+                ) {
+                    Text("Auto Detect", fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
 
-                // AI floating neon scanner laser line
-                val lineY = 240.dp * sweepPosition
+                // Manual Adjust Tab Button
+                Button(
+                    onClick = { isManualCropMode = true },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isManualCropMode) ScannerGlowGreen else Color.Transparent,
+                        contentColor = if (isManualCropMode) Color.Black else Color.White
+                    ),
+                    shape = RoundedCornerShape(16.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                    modifier = Modifier.height(32.dp)
+                ) {
+                    Text("Manual Adjust", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            // Beautiful Large Concentric Shutter Capture Button
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.15f))
+                    .border(4.dp, Color.White, CircleShape)
+                    .clickable {
+                        // Action to go to post-scan preview screen
+                        viewModel.currentScreen = ActiveScreen.POST_SCAN_PREVIEW
+                    }
+                    .padding(6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape)
+                        .background(ScannerGlowGreen)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Capture Document",
+                        tint = Color.Black,
+                        modifier = Modifier.size(36.dp).align(Alignment.Center)
+                    )
+                }
+            }
+
+            // Display loading overlay if processing scan
+            if (viewModel.isScanningModeActive) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(3.dp)
-                        .offset(y = lineY - 120.dp)
-                        .background(
-                            Brush.horizontalGradient(
-                                listOf(Color.Transparent, ScannerGlowGreen, Color.Transparent)
-                            )
-                        )
-                )
-
-                // Drag handles for Manual Fine Tuning Mode
-                if (isManualCropMode) {
-                    // TL Handle
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .offset(
-                                x = (this.maxWidth * tl.x) - 19.dp,
-                                y = (this.maxHeight * tl.y) - 19.dp
-                            )
-                            .pointerInput(Unit) {
-                                detectDragGestures { change, dragAmount ->
-                                    change.consume()
-                                    val newX = (tl.x + dragAmount.x / widthPx).coerceIn(0.01f, 0.48f)
-                                    val newY = (tl.y + dragAmount.y / heightPx).coerceIn(0.01f, 0.48f)
-                                    tl = Offset(newX, newY)
-                                }
-                            }
-                            .background(Color.White.copy(alpha = 0.2f), CircleShape)
-                            .border(2.dp, ScannerGlowGreen, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Box(modifier = Modifier.size(8.dp).background(Color.White, CircleShape))
-                    }
-
-                    // TR Handle
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .offset(
-                                x = (this.maxWidth * tr.x) - 19.dp,
-                                y = (this.maxHeight * tr.y) - 19.dp
-                            )
-                            .pointerInput(Unit) {
-                                detectDragGestures { change, dragAmount ->
-                                    change.consume()
-                                    val newX = (tr.x + dragAmount.x / widthPx).coerceIn(0.52f, 0.99f)
-                                    val newY = (tr.y + dragAmount.y / heightPx).coerceIn(0.01f, 0.48f)
-                                    tr = Offset(newX, newY)
-                                }
-                            }
-                            .background(Color.White.copy(alpha = 0.2f), CircleShape)
-                            .border(2.dp, ScannerGlowGreen, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Box(modifier = Modifier.size(8.dp).background(Color.White, CircleShape))
-                    }
-
-                    // BR Handle
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .offset(
-                                x = (this.maxWidth * br.x) - 19.dp,
-                                y = (this.maxHeight * br.y) - 19.dp
-                            )
-                            .pointerInput(Unit) {
-                                detectDragGestures { change, dragAmount ->
-                                    change.consume()
-                                    val newX = (br.x + dragAmount.x / widthPx).coerceIn(0.52f, 0.99f)
-                                    val newY = (br.y + dragAmount.y / heightPx).coerceIn(0.52f, 0.99f)
-                                    br = Offset(newX, newY)
-                                }
-                            }
-                            .background(Color.White.copy(alpha = 0.2f), CircleShape)
-                            .border(2.dp, ScannerGlowGreen, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Box(modifier = Modifier.size(8.dp).background(Color.White, CircleShape))
-                    }
-
-                    // BL Handle
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .offset(
-                                x = (this.maxWidth * bl.x) - 19.dp,
-                                y = (this.maxHeight * bl.y) - 19.dp
-                            )
-                            .pointerInput(Unit) {
-                                detectDragGestures { change, dragAmount ->
-                                    change.consume()
-                                    val newX = (bl.x + dragAmount.x / widthPx).coerceIn(0.01f, 0.48f)
-                                    val newY = (bl.y + dragAmount.y / heightPx).coerceIn(0.52f, 0.99f)
-                                    bl = Offset(newX, newY)
-                                }
-                            }
-                            .background(Color.White.copy(alpha = 0.2f), CircleShape)
-                            .border(2.dp, ScannerGlowGreen, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Box(modifier = Modifier.size(8.dp).background(Color.White, CircleShape))
-                    }
-                }
-
-                // Beautiful HUD detailing simulated sensors & live statistics
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(12.dp),
-                    verticalArrangement = Arrangement.SpaceBetween
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
+                        .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
+                        .padding(16.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Surface(
-                            color = Color.Black.copy(alpha = 0.7f),
-                            shape = RoundedCornerShape(4.dp)
-                        ) {
-                            Text(
-                                text = "ISO Auto | F/2.4 | ${"%.1f".format(96.2f + sweepPosition * 2.5f)}% Edge Conf",
-                                style = androidx.compose.ui.text.TextStyle(fontSize = 9.sp, fontFamily = FontFamily.Monospace, color = Color.White),
-                                modifier = Modifier.padding(4.dp)
-                            )
-                        }
-                        
-                        // Switch mode button (Auto vs Manual fine-tune)
-                        Button(
-                            onClick = { isManualCropMode = !isManualCropMode },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isManualCropMode) MaterialTheme.colorScheme.primary else Color.Black.copy(alpha = 0.8f),
-                                contentColor = Color.White
-                            ),
-                            shape = RoundedCornerShape(4.dp),
-                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
-                            modifier = Modifier.height(24.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (isManualCropMode) Icons.Default.Check else Icons.Default.Edit,
-                                contentDescription = null,
-                                modifier = Modifier.size(10.dp)
-                            )
-                            Spacer(modifier = Modifier.width(3.dp))
-                            Text(
-                                text = if (isManualCropMode) "Selesai" else "Sesuai Tepi",
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.CenterHorizontally)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color.Black.copy(alpha = 0.7f))
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = if (isManualCropMode) getLangText("ocr_overlay_adjust") else getLangText("ocr_overlay_detected"),
-                            fontSize = 10.sp,
+                            text = "PROSES INTEGRITAS DOKUMEN LAPANGAN...",
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (isManualCropMode) ScannerGlowGreen else Color.LightGray,
-                            textAlign = TextAlign.Center
+                            color = MaterialTheme.colorScheme.primary,
+                            fontFamily = FontFamily.Monospace
                         )
-                    }
-
-                    // Progress loading popup if actively building OCR
-                    if (viewModel.isScanningModeActive) {
-                        Box(
+                        Spacer(modifier = Modifier.height(6.dp))
+                        LinearProgressIndicator(
+                            progress = { viewModel.scanningProgress },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
-                                .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
-                                .padding(12.dp)
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = "PROSES INTEGRITAS DOKUMEN LAPANGAN...",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                LinearProgressIndicator(
-                                    progress = { viewModel.scanningProgress },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(6.dp)
-                                        .clip(RoundedCornerShape(3.dp)),
-                                    color = ScannerGlowGreen,
-                                    trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "Filter: ${viewModel.scanFilterType}\n${viewModel.ocrProgressLog}",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontFamily = FontFamily.Monospace,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.padding(horizontal = 12.dp)
-                                )
-                            }
-                        }
-                    } else {
-                        // Empty spacer to occupy space
-                        Spacer(modifier = Modifier.height(1.dp))
+                                .height(6.dp)
+                                .clip(RoundedCornerShape(3.dp)),
+                            color = ScannerGlowGreen,
+                            trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Filter: ${viewModel.scanFilterType}\n${viewModel.ocrProgressLog}",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontFamily = FontFamily.Monospace,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 12.dp)
+                        )
                     }
                 }
+            } else {
+                Text(
+                    text = getLangText("scan_guide"),
+                    fontSize = 10.sp,
+                    color = Color.LightGray.copy(alpha = 0.7f),
+                    textAlign = TextAlign.Center,
+                    fontFamily = FontFamily.Monospace
+                )
             }
         }
 
-        // Simply show the camera viewfinder and a capture button.
-        item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 24.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                FloatingActionButton(
-                    onClick = { 
-                        // Directly go to post-scan preview
-                        viewModel.currentScreen = ActiveScreen.POST_SCAN_PREVIEW
-                    },
-                    modifier = Modifier.size(72.dp),
-                    shape = CircleShape,
-                    containerColor = Color.White,
-                    contentColor = MaterialTheme.colorScheme.primary
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Capture Document", modifier = Modifier.size(36.dp))
-                }
-            }
+        // Onboarding coach marks
+        if (viewModel.onboardingStep == 2) {
+            CoachMarkOverlay(
+                text = "Arahkan kamera ke dokumen. AI akan mendeteksi batas tepi (Edge Detection) secara otomatis.",
+                alignment = Alignment.Center,
+                onNext = { viewModel.completeOnboardingStep() }
+            )
         }
-    } // close LazyColumn
-    
-    if (viewModel.onboardingStep == 2) {
-        CoachMarkOverlay(
-            text = "Arahkan kamera ke dokumen. AI akan mendeteksi batas tepi (Edge Detection) secara otomatis.",
-            alignment = Alignment.Center,
-            onNext = { viewModel.completeOnboardingStep() }
-        )
     }
-} // close Box
-} // close CameraScannerScreen
+}
 
 // ==========================================
 // SCREEN 2.5: POST-SCAN PREVIEW
